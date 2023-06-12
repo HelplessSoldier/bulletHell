@@ -1,3 +1,4 @@
+from typing import Any
 import pygame
 import random
 
@@ -23,16 +24,22 @@ class Player(pygame.sprite.Sprite):
         pygame.draw.circle(surface=self.screen, color=self.playerColor, center=(self.playerLocX, self.playerLocY), radius=self.playerRadius)
         
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, screen, projectileRadius, projectileColor, spawnLocX, spawnLocY):
+    def __init__(self, screen, projectileRadius, projectileColor, spawnLocX, spawnLocY, initialVelocity):
         super().__init__()
         self.screen = screen
         self.Radius = projectileRadius
         self.Color = projectileColor
-        self.spawnLocX = spawnLocX
-        self.spawnLocY = spawnLocY
+        self.LocX = spawnLocX
+        self.LocY = spawnLocY
+        self.gravity = 0.1
+        self.speed = initialVelocity
+        
+    def update(self):
+        self.speed += self.gravity
+        self.LocY += self.speed
         
     def draw(self):
-        pygame.draw.circle(surface=self.screen, color=self.projectileColor, center=(self.spawnLocX, self.spawnLocY), radius=self.projectileRadius)
+        pygame.draw.circle(surface=self.screen, color=self.projectileColor, center=(self.LocX, self.LocY), radius=self.projectileRadius)
         
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, screen, enemyRadius, enemyColor, spawnLocX, spawnLocY):
@@ -83,7 +90,6 @@ while running:
     #spawn projectiles
     projectiles = []
     
-        
     screen.fill((0, 0, 0))  
     player1.draw() 
     
