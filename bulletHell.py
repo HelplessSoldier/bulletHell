@@ -5,14 +5,15 @@ import time
 
 SCREENWIDTH = 700
 SCREENHEIGHT = 900
+PROJECTILECOUNT = 0
 SPEEDMULTIPLIER = 0.6
 RED = (255, 0, 0)
+YELLOW = (255, 255, 0)
 
 pygame.init()
 screen = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
 clock = pygame.time.Clock()
 running = True
-
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, screen, playerRadius, playerColor, playerLocX, playerLocY):
@@ -40,7 +41,7 @@ class Projectile:
         self.y += self.speedY
 
     def draw(self, screen, radius):
-        pygame.draw.circle(screen, RED, (self.x, self.y), radius)
+        pygame.draw.circle(screen, YELLOW, (self.x, self.y), radius)
 
         
 class Enemy(pygame.sprite.Sprite):
@@ -55,19 +56,7 @@ class Enemy(pygame.sprite.Sprite):
     def draw(self):
         pygame.draw.circle(surface=self.screen, color=self.color, center=(self.locX, self.locY), radius=self.radius)
 
-
-projectiles = []
-# create player obj
-player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
-last_executed_time = time.time()
-PROJECTILECOUNT = 0
-    
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-    
-    # player movement with arrow keys, can't pull out MOVEMENTSPEED due to slow move
+def playerMovement():
     MOVEMENTSPEED = 800
     keys = pygame.key.get_pressed()
     if keys[pygame.K_z]:
@@ -80,27 +69,25 @@ while running:
         player1.playerLocX -= MOVEMENTSPEED * deltaTime
     if keys[pygame.K_RIGHT]:
         player1.playerLocX += MOVEMENTSPEED * deltaTime
-        
-    # lock player to screenspace
-    # TODO: left and top of screen not accurate
-    if player1.playerLocX < (player1.playerRadius / 2):
-        player1.playerLocX = (player1.playerRadius / 2)
+    
+def playerScreenLock(player1):
+    if player1.playerLocX < (player1.playerRadius):
+        player1.playerLocX = (player1.playerRadius)
     if player1.playerLocX > SCREENWIDTH - player1.playerRadius:
         player1.playerLocX = SCREENWIDTH - player1.playerRadius
-    if player1.playerLocY < (player1.playerRadius / 2):
-        player1.playerLocY = (player1.playerRadius / 2)
+    if player1.playerLocY < (player1.playerRadius):
+        player1.playerLocY = (player1.playerRadius)
     if player1.playerLocY > SCREENHEIGHT - player1.playerRadius:
         player1.playerLocY = SCREENHEIGHT - player1.playerRadius
-        
-    screen.fill((0, 0, 0))  
-    
+
+def generateRandomProjectiles(last_executed_time, initial_projectile_count):
     current_time = time.time()
+    PROJECTILECOUNT = initial_projectile_count
     if current_time - last_executed_time >= .5:
-        PROJECTILECOUNT = 10
+        PROJECTILECOUNT = 1
         last_executed_time = current_time
     
     while PROJECTILECOUNT > 0:
-        # new_projectile = Projectile(screen, 10, RED, 100, 100, (-1, 1))
         new_projectile = Projectile(random.randint(0, SCREENWIDTH), 100, random.randint(-1,1), random.randint(-1,1))
         projectiles.append(new_projectile)
         PROJECTILECOUNT -= 1
@@ -110,8 +97,23 @@ while running:
         projectile.draw(screen, 10)
         if projectile.y <= 0:
             projectiles.remove(projectile)
-            
+
+projectiles = []
+last_executed_time = time.time()
+player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
     
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    
+    playerMovement()
+    playerScreenLock(player1)
+        
+    screen.fill((0, 0, 0))  
+        
+    generateRandomProjectiles(last_executed_time, 2)
+            
     player1.draw() 
     
     pygame.display.flip()
