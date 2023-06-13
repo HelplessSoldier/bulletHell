@@ -4,11 +4,14 @@ import random
 import time
 import math
 
+LIVES = 3
 SCREENWIDTH = 700
 SCREENHEIGHT = 900
 MOVEMENTSPEED = 800
 SPEEDMULTIPLIER = 0.6
-PROJECTILERADIUS = 10
+PROJECTILERADIUS = 5
+PROJECTILESPEED = 5
+GRAVITY = .2
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
@@ -35,10 +38,10 @@ class Projectile:
         self.y = y
         self.speedY = initial_speed_y
         self.speedX = initial_speed_x
-        self.gravity = .5
+        self.gravity = GRAVITY
 
     def update(self):
-        self.speedY += self.gravity
+        self.x += self.speedX
         self.y += self.speedY
 
     def draw(self, screen, radius):
@@ -80,24 +83,25 @@ def playerScreenLock(player1):
     if player1.playerLocY > SCREENHEIGHT - player1.playerRadius:
         player1.playerLocY = SCREENHEIGHT - player1.playerRadius
 
-def generateRandomProjectiles(last_executed_time, initial_projectile_count, projectile_radius):
-    current_time = time.time()
-    PROJECTILECOUNT = initial_projectile_count
-    if current_time - last_executed_time >= 10:
-        PROJECTILECOUNT = 1
-        last_executed_time = current_time
-    
-    while PROJECTILECOUNT > 0:
-        new_projectile = Projectile(random.randint(0, SCREENWIDTH), 100, random.randint(-1,1), random.randint(-1,1))
+def generateCircularProjectiles(projectiles, projectile_count, projectile_radius, sourceX, sourceY, angle):
+    angle_increment = 2 * math.pi / projectile_count
+    current_angle = angle
+
+    for _ in range(projectile_count):
+        direction_x = math.cos(current_angle) * PROJECTILESPEED
+        direction_y = math.sin(current_angle) * PROJECTILESPEED
+
+        new_projectile = Projectile(sourceX, sourceY, direction_x, direction_y)
         projectiles.append(new_projectile)
-        PROJECTILECOUNT -= 1
+
+        current_angle += angle_increment
         
     for projectile in projectiles:
         projectile.update()
         projectile.draw(screen, projectile_radius)
         if projectile.y <= 0:
             projectiles.remove(projectile)
-            
+
 def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projectileRadius):
     distance = math.sqrt((playerX - projectileX) ** 2 + (playerY - projectileY) ** 2)
     threshold = playerRadius + projectileRadius
@@ -106,11 +110,25 @@ def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projec
     else:
         return False
 
+# life count display
+heart_image = pygame.image.load('heart.png')
+heart_width = 32
+heart_height = 32
+def drawLives(lives):
+    for i in range(lives):
+        x = i * (heart_width + 5) 
+        y = 0  
+        screen.blit(heart_image, (x, y)) 
+
 projectiles = []
-last_executed_time = time.time()
 player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
 
-hitcount = 0
+game_over = False
+game_over_timer = 0
+game_over_duration = 6000
+default_font = pygame.font.Font(pygame.font.get_default_font(), 32)
+game_over_text = default_font.render('GAME OVER', True, (255, 255, 255))
+
 # main loop
 while running:
     for event in pygame.event.get():
@@ -121,15 +139,23 @@ while running:
     playerScreenLock(player1)
         
     screen.fill((0, 0, 0))  
-        
-    generateRandomProjectiles(last_executed_time, 2, PROJECTILERADIUS)
+    
+    generateCircularProjectiles(projectiles, 8, PROJECTILERADIUS, random.randint(100, 600), 100, random.randint(0,20))
+    
+    drawLives(LIVES)    
     
     for projectile in projectiles:
         if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, PROJECTILERADIUS):
-            print(f'HIT {hitcount}')
             projectiles.remove(projectile)
-            hitcount += 1
-            
+            LIVES -= 1
+    
+    if LIVES <= 0:
+        screen.blit(game_over_text, (SCREENWIDTH // 2 - game_over_text.get_width() // 2, SCREENHEIGHT // 2 - game_over_text.get_height() // 2))
+
+        current_time = pygame.time.get_ticks()
+        if current_time - game_over_timer >= game_over_duration:
+            running = False 
+
     player1.draw() 
     pygame.display.flip()
     
