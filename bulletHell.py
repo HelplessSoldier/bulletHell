@@ -1,15 +1,18 @@
 from typing import Any
 import pygame
 import random
+import time
 
-pygame.init()
 SCREENWIDTH = 700
 SCREENHEIGHT = 900
+SPEEDMULTIPLIER = 0.6
+RED = (255, 0, 0)
+
+pygame.init()
 screen = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
 clock = pygame.time.Clock()
 running = True
-RED = (255, 0, 0)
-SPEEDMULTIPLIER = 0.6
+
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, screen, playerRadius, playerColor, playerLocX, playerLocY):
@@ -22,24 +25,23 @@ class Player(pygame.sprite.Sprite):
 
     def draw(self):
         pygame.draw.circle(surface=self.screen, color=self.playerColor, center=(self.playerLocX, self.playerLocY), radius=self.playerRadius)
-        
-class Projectile(pygame.sprite.Sprite):
-    def __init__(self, screen, projectileRadius, projectileColor, spawnLocX, spawnLocY, initialVelocity):
-        super().__init__()
-        self.screen = screen
-        self.Radius = projectileRadius
-        self.Color = projectileColor
-        self.LocX = spawnLocX
-        self.LocY = spawnLocY
-        self.gravity = 0.1
-        self.speed = initialVelocity
-        
+
+
+class Projectile:
+    def __init__(self, x, y, initial_speed_x, initial_speed_y):
+        self.x = x
+        self.y = y
+        self.speedY = initial_speed_y
+        self.speedX = initial_speed_x
+        self.gravity = .5
+
     def update(self):
-        self.speed += self.gravity
-        self.LocY += self.speed
-        
-    def draw(self):
-        pygame.draw.circle(surface=self.screen, color=self.projectileColor, center=(self.LocX, self.LocY), radius=self.projectileRadius)
+        self.speedY += self.gravity
+        self.y += self.speedY
+
+    def draw(self, screen, radius):
+        pygame.draw.circle(screen, RED, (self.x, self.y), radius)
+
         
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, screen, enemyRadius, enemyColor, spawnLocX, spawnLocY):
@@ -54,15 +56,18 @@ class Enemy(pygame.sprite.Sprite):
         pygame.draw.circle(surface=self.screen, color=self.color, center=(self.locX, self.locY), radius=self.radius)
 
 
+projectiles = []
 # create player obj
 player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
-
+last_executed_time = time.time()
+PROJECTILECOUNT = 0
+    
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
     
-    # player movement with arrow keys
+    # player movement with arrow keys, can't pull out MOVEMENTSPEED due to slow move
     MOVEMENTSPEED = 800
     keys = pygame.key.get_pressed()
     if keys[pygame.K_z]:
@@ -87,10 +92,26 @@ while running:
     if player1.playerLocY > SCREENHEIGHT - player1.playerRadius:
         player1.playerLocY = SCREENHEIGHT - player1.playerRadius
         
-    #spawn projectiles
-    projectiles = []
-    
     screen.fill((0, 0, 0))  
+    
+    current_time = time.time()
+    if current_time - last_executed_time >= .5:
+        PROJECTILECOUNT = 10
+        last_executed_time = current_time
+    
+    while PROJECTILECOUNT > 0:
+        # new_projectile = Projectile(screen, 10, RED, 100, 100, (-1, 1))
+        new_projectile = Projectile(random.randint(0, SCREENWIDTH), 100, random.randint(-1,1), random.randint(-1,1))
+        projectiles.append(new_projectile)
+        PROJECTILECOUNT -= 1
+        
+    for projectile in projectiles:
+        projectile.update()
+        projectile.draw(screen, 10)
+        if projectile.y <= 0:
+            projectiles.remove(projectile)
+            
+    
     player1.draw() 
     
     pygame.display.flip()
