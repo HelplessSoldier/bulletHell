@@ -2,11 +2,13 @@ from typing import Any
 import pygame
 import random
 import time
+import math
 
 SCREENWIDTH = 700
 SCREENHEIGHT = 900
-PROJECTILECOUNT = 0
+MOVEMENTSPEED = 800
 SPEEDMULTIPLIER = 0.6
+PROJECTILERADIUS = 10
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
@@ -27,7 +29,6 @@ class Player(pygame.sprite.Sprite):
     def draw(self):
         pygame.draw.circle(surface=self.screen, color=self.playerColor, center=(self.playerLocX, self.playerLocY), radius=self.playerRadius)
 
-
 class Projectile:
     def __init__(self, x, y, initial_speed_x, initial_speed_y):
         self.x = x
@@ -43,7 +44,6 @@ class Projectile:
     def draw(self, screen, radius):
         pygame.draw.circle(screen, YELLOW, (self.x, self.y), radius)
 
-        
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, screen, enemyRadius, enemyColor, spawnLocX, spawnLocY):
         super().__init__()
@@ -56,8 +56,8 @@ class Enemy(pygame.sprite.Sprite):
     def draw(self):
         pygame.draw.circle(surface=self.screen, color=self.color, center=(self.locX, self.locY), radius=self.radius)
 
-def playerMovement():
-    MOVEMENTSPEED = 800
+def playerMovement(speed):
+    MOVEMENTSPEED = speed
     keys = pygame.key.get_pressed()
     if keys[pygame.K_z]:
         MOVEMENTSPEED = MOVEMENTSPEED * SPEEDMULTIPLIER
@@ -80,10 +80,10 @@ def playerScreenLock(player1):
     if player1.playerLocY > SCREENHEIGHT - player1.playerRadius:
         player1.playerLocY = SCREENHEIGHT - player1.playerRadius
 
-def generateRandomProjectiles(last_executed_time, initial_projectile_count):
+def generateRandomProjectiles(last_executed_time, initial_projectile_count, projectile_radius):
     current_time = time.time()
     PROJECTILECOUNT = initial_projectile_count
-    if current_time - last_executed_time >= .5:
+    if current_time - last_executed_time >= 10:
         PROJECTILECOUNT = 1
         last_executed_time = current_time
     
@@ -94,29 +94,45 @@ def generateRandomProjectiles(last_executed_time, initial_projectile_count):
         
     for projectile in projectiles:
         projectile.update()
-        projectile.draw(screen, 10)
+        projectile.draw(screen, projectile_radius)
         if projectile.y <= 0:
             projectiles.remove(projectile)
+            
+def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projectileRadius):
+    distance = math.sqrt((playerX - projectileX) ** 2 + (playerY - projectileY) ** 2)
+    threshold = playerRadius + projectileRadius
+    if threshold > distance:
+        return True
+    else:
+        return False
 
 projectiles = []
 last_executed_time = time.time()
 player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
-    
+
+hitcount = 0
+# main loop
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
     
-    playerMovement()
+    playerMovement(MOVEMENTSPEED)
     playerScreenLock(player1)
         
     screen.fill((0, 0, 0))  
         
-    generateRandomProjectiles(last_executed_time, 2)
+    generateRandomProjectiles(last_executed_time, 2, PROJECTILERADIUS)
+    
+    for projectile in projectiles:
+        if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, PROJECTILERADIUS):
+            print(f'HIT {hitcount}')
+            projectiles.remove(projectile)
+            hitcount += 1
             
     player1.draw() 
-    
     pygame.display.flip()
+    
     clock.tick(60)
     deltaTime = clock.tick(60) / 1000
     
