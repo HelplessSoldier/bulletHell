@@ -16,6 +16,7 @@ RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
 pygame.init()
+pygame.mixer.init()
 screen = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
 clock = pygame.time.Clock()
 running = True
@@ -126,10 +127,11 @@ player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
 game_over = False
 game_over_timer = 0
 game_over_duration = 5000
-default_font = pygame.font.Font(pygame.font.get_default_font(), 32)
+default_font = pygame.font.Font(pygame.font.get_default_font(), 75)
 game_over_text = default_font.render('GAME OVER', True, (255, 255, 255))
+start_time = pygame.time.get_ticks()
 # hacky shit incoming (holds endgame screen for game_over_duration)
-i = True
+gameTimeThing = True
 
 # main loop
 while running:
@@ -145,20 +147,25 @@ while running:
     generateCircularProjectiles(projectiles, 8, PROJECTILERADIUS, random.randint(100, 600), 100, random.randint(0,20))
     
     drawLives(LIVES)    
-    
+# hit detection
     for projectile in projectiles:
         if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, PROJECTILERADIUS):
             projectiles.remove(projectile)
             LIVES -= 1
-    
+            pygame.mixer.music.load('hitsound.mp3')
+            pygame.mixer.music.play()
+  
+ # game over condition  
+ #TODO fix time/score 
     if LIVES <= 0:
-        screen.blit(game_over_text, (SCREENWIDTH // 2 - game_over_text.get_width() // 2, SCREENHEIGHT // 2 - game_over_text.get_height() // 2))
-
         current_time = pygame.time.get_ticks()
+        screen.blit(game_over_text, (SCREENWIDTH // 2 - game_over_text.get_width() // 2, SCREENHEIGHT // 2 - game_over_text.get_height() // 2))
+        elapsed_time_text = default_font.render("TIME: " + str((current_time - start_time)//1000) + " S", True, (255,255,255))
+        screen.blit(elapsed_time_text, (SCREENWIDTH // 2 - elapsed_time_text.get_width() // 2, 700))
         
-        if i:
+        if gameTimeThing:
             start_time = current_time
-            i = False
+            gameTimeThing= False
             
         if current_time - start_time >= game_over_duration:
             running = False 
@@ -169,4 +176,5 @@ while running:
     clock.tick(60)
     deltaTime = clock.tick(60) / 1000
     
+pygame.mixer.music.stop()
 pygame.quit()
