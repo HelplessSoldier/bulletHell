@@ -125,9 +125,11 @@ player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
 
 game_over = False
 game_over_timer = 0
-game_over_duration = 6000
+game_over_duration = 5000
 default_font = pygame.font.Font(pygame.font.get_default_font(), 32)
 game_over_text = default_font.render('GAME OVER', True, (255, 255, 255))
+# hacky shit incoming (holds endgame screen for game_over_duration)
+i = True
 
 # main loop
 while running:
@@ -153,7 +155,12 @@ while running:
         screen.blit(game_over_text, (SCREENWIDTH // 2 - game_over_text.get_width() // 2, SCREENHEIGHT // 2 - game_over_text.get_height() // 2))
 
         current_time = pygame.time.get_ticks()
-        if current_time - game_over_timer >= game_over_duration:
+        
+        if i:
+            start_time = current_time
+            i = False
+            
+        if current_time - start_time >= game_over_duration:
             running = False 
 
     player1.draw() 
