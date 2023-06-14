@@ -6,13 +6,96 @@ from tkinter import filedialog
 from typing import Any
 import random
 import math
-import librosa
+import threading
+import aubio
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))
 clock = pygame.time.Clock()
 
-selected_song = None
+# Constants for frequency ranges
+BASS_RANGE = (20, 250)  # Modify as needed
+MIDS_RANGE = (250, 4000)  # Modify as needed
+HIGHS_RANGE = (4000, 20000)  # Modify as needed
+
+# Constants for event thresholds
+BASS_THRESHOLD = 0.1  # Modify as needed
+MIDS_THRESHOLD = 0.05  # Modify as needed
+HIGHS_THRESHOLD = 0.0  # Modify as needed
+
+# Event constants
+BASS_EVENT = 'BassEvent'
+MIDS_EVENT = 'MidsEvent'
+HIGHS_EVENT = 'HighsEvent'
+
+# Event handlers (replace with your own code)
+def handle_bass_event():
+    print("Bass event detected!")
+
+def handle_mids_event():
+    print("Mids event detected!")
+
+def handle_highs_event():
+    print("Highs event detected!")
+
+def start_audio_analysis():
+    def audio_analysis_thread():
+        # Load the audio file (replace with your own audio source)
+        audio_file = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
+        
+        # Initialize pygame and the mixer for audio playback
+        pygame.mixer.init()
+
+        # Load and play the audio file
+        pygame.mixer.music.load(audio_file)
+        pygame.mixer.music.play()
+
+        # Create the Aubio source
+        samplerate, hop_size = 0, 256  # Adjust hop size as needed
+        aubio_source = aubio.source(audio_file, samplerate, hop_size)
+
+        # Create the Aubio pitch object for volume analysis
+        aubio_pitch = aubio.pitch("default", hop_size, hop_size, samplerate)
+
+        # Start the audio analysis loop
+        while True:
+            samples, read = aubio_source()
+
+            # Calculate the volume levels in each frequency range
+            bass_volume = 0
+            mids_volume = 0
+            highs_volume = 0
+
+            if read > 0:
+                # Calculate the pitch for volume analysis
+                pitch = aubio_pitch(samples)[0]
+
+                # Calculate the frequency ranges of interest
+                if pitch >= BASS_RANGE[0] and pitch <= BASS_RANGE[1]:
+                    bass_volume = max(samples)
+                    print(bass_volume)
+
+                if pitch >= MIDS_RANGE[0] and pitch <= MIDS_RANGE[1]:
+                    mids_volume = max(samples)
+                    print(mids_volume)
+
+                if pitch >= HIGHS_RANGE[0] and pitch <= HIGHS_RANGE[1]:
+                    highs_volume = max(samples)
+                    print(highs_volume)
+
+            # Trigger events based on volume thresholds
+            if bass_volume > BASS_THRESHOLD:
+                handle_bass_event()
+
+            if mids_volume > MIDS_THRESHOLD:
+                handle_mids_event()
+
+            if highs_volume > HIGHS_THRESHOLD:
+                handle_highs_event()
+
+    # Start the audio analysis thread
+    audio_thread = threading.Thread(target=audio_analysis_thread)
+    audio_thread.start()
 
 def mainMenu():
     while True:
@@ -40,6 +123,7 @@ def mainMenu():
         mouse_click = pygame.mouse.get_pressed()
 
         if start_button.collidepoint(mouse_pos) and mouse_click[0] == 1:
+            start_audio_analysis()
             gameLoop()
 
         if song_button.collidepoint(mouse_pos) and mouse_click[0] == 1:
@@ -221,6 +305,7 @@ def gameLoop():
     attack_start_time = pygame.time.get_ticks()
     gameTimeThing = True # goofy hack for game over condition
     enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=PURPLE)
+    hitsound = pygame.mixer.Sound('hitsound.mp3')
 
 
     # main loop---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -239,8 +324,7 @@ def gameLoop():
             if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, PROJECTILERADIUS):
                 projectiles.remove(projectile)
                 LIVES -= 1
-                pygame.mixer.music.load('hitsound.mp3')
-                pygame.mixer.music.play()
+                hitsound.play()
     
     # game over condition  
         if LIVES <= 0:
@@ -282,4 +366,4 @@ def gameLoop():
     pygame.mixer.music.stop()
     pygame.quit()
 
-gameLoop()
+mainMenu()
