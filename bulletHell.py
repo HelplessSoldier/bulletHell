@@ -1,10 +1,9 @@
 from typing import Any
 import pygame
 import random
-import time
 import math
 
-LIVES = 3
+LIVES = 9
 SCREENWIDTH = 700
 SCREENHEIGHT = 900
 MOVEMENTSPEED = 800
@@ -63,7 +62,7 @@ class Enemy(pygame.sprite.Sprite):
         self.target = self.position
         self.speed = 4
         self.attack_delay = 500  # Delay between attacks in milliseconds
-        self.last_attack_time = pygame.time.get_ticks()  # Initialize last attack time
+        self.last_attack_time = pygame.time.get_ticks() 
 
     def update(self):
         # Interpolate towards the target position
@@ -84,6 +83,15 @@ class Enemy(pygame.sprite.Sprite):
         if current_time - self.last_attack_time >= self.attack_delay:
             self.last_attack_time = current_time
             generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
+            
+    def attackBass(self):
+        pass
+    
+    def attackMids(self):
+        pass
+    
+    def attackHighs(self):
+        pass
             
     def draw(self):
         pygame.draw.circle(surface=self.screen, color=self.color, center=(self.position[0], self.position[1]), radius=self.radius)
@@ -124,12 +132,6 @@ def generateCircularProjectiles(projectiles, projectile_count, projectile_radius
         projectiles.append(new_projectile)
 
         current_angle += angle_increment
-        
-    # for projectile in projectiles:
-    #     projectile.update()
-    #     projectile.draw(screen, projectile_radius)
-    #     if projectile.y <= 0:
-    #         projectiles.remove(projectile)
 
 def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projectileRadius):
     distance = math.sqrt((playerX - projectileX) ** 2 + (playerY - projectileY) ** 2)
@@ -139,7 +141,6 @@ def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projec
     else:
         return False
 
-# life count display
 heart_image = pygame.image.load('heart.png')
 heart_width = 32
 heart_height = 32
@@ -163,10 +164,10 @@ default_font = pygame.font.Font(pygame.font.get_default_font(), 75)
 game_over_text = default_font.render('GAME OVER', True, (255, 255, 255))
 start_time = pygame.time.get_ticks()
 attack_start_time = pygame.time.get_ticks()
-gameTimeThing = True # goofy hack
+gameTimeThing = True # goofy hack for game over condition
 enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=PURPLE)
 
-# main loop
+# main loop---------------------------------------------------------------------------------------------------------------------------------------------------
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -210,9 +211,7 @@ while running:
     if attack_current_time - attack_start_time >= 1:
         enemy.attackBasic()
         attack_start_time = attack_current_time
-    
-    
-#---------------------------------------------------------------------------------------------------------
+
     enemy.update()
     enemy.draw()
 
