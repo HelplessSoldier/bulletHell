@@ -11,7 +11,7 @@ import librosa
 import queue
 import time
 
-music_path = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
+music_path = '/home/patrick/Desktop/my_github_repos/bulletHell/cYsmix_theBalladOfAMindlessGirl.mp3'
 
 def populate_beat_stack(audio_path):
     waveform, sample_rate = librosa.load(audio_path)
@@ -163,7 +163,7 @@ def gameLoop(beats, onsets):
                 generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
                 
         def attackOnset(self):
-            generateCircularProjectiles(projectiles, projectile_count=9, projectile_radius=20, sourceX=self.position[0], sourceY=self.position[1], angle=60, color=YELLOW)
+            generateCircularProjectiles(projectiles, projectile_count=9, projectile_radius=20, sourceX=self.position[0], sourceY=self.position[1], angle=random.randint(0,360), color=YELLOW)
             
         def attackBeat(self):
             generateCircularProjectiles(projectiles, projectile_count=16, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0, color=PURPLE)
@@ -210,7 +210,8 @@ def gameLoop(beats, onsets):
 
     def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projectileRadius):
         distance = math.sqrt((playerX - projectileX) ** 2 + (playerY - projectileY) ** 2)
-        threshold = playerRadius + projectileRadius
+        # threshold = playerRadius + projectileRadius
+        threshold = projectileRadius
         if threshold > distance:
             return True
         else:
@@ -294,14 +295,14 @@ def gameLoop(beats, onsets):
         onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
         if onset_current_time >= (onsets[onset_index] * 1000):
             enemy.attackOnset()
-            print(f'onsettime: {onsets[onset_index]} currentTime: {onset_current_time} last_onset: {last_onset}')
+            # print(f'onsettime: {onsets[onset_index]} currentTime: {onset_current_time} last_onset: {last_onset}')
             last_onset = onset_current_time
             onset_index += 1
             
         beat_current_time = pygame.time.get_ticks() - attack_start_time_ms
         if beat_current_time >= (beats[beat_index] * 1000):
             enemy.attackBeat()
-            print(f'beattime: {beats[beat_index]} currentTime: {beat_current_time} last_beat: {last_beat}')
+            # print(f'beattime: {beats[beat_index]} currentTime: {beat_current_time} last_beat: {last_beat}')
             last_beat = beat_current_time
             beat_index += 1
   
