@@ -11,47 +11,27 @@ import librosa
 import queue
 import time
 
-pygame.init()
-screen = pygame.display.set_mode((800, 600))
-clock = pygame.time.Clock()
+music_path = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
 
-onset_queue = queue.Queue()
-def start_audio_analysis():
-    def audio_analysis_thread():
-        # Load the audio file TODO: make this user input via 'select song'
-        audio_file = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
+def populate_beat_stack(audio_path):
+    waveform, sample_rate = librosa.load(audio_path)
+    tempo, beat_frames = librosa.beat.beat_track(y=waveform, sr=sample_rate)
+    beat_times = librosa.frames_to_time(beat_frames, sr=sample_rate)
 
-        # Initialize pygame and the mixer for audio playback
-        pygame.mixer.init()
+    return beat_times
 
-        # Load and play the audio file
-        pygame.mixer.music.load(audio_file)
-        pygame.mixer.music.play()
+def populate_onset_stack(audio_path):
+    waveform, sample_rate = librosa.load(audio_path)
+    onset_frames = librosa.onset.onset_detect(y=waveform, sr=sample_rate, hop_length=512, backtrack=True)
+    onset_times = librosa.frames_to_time(onset_frames, sr=sample_rate)
 
-        # Load audio with Librosa
-        audio, sr = librosa.load(audio_file)
-
-        # Detect onsets using Librosa
-        onsets = librosa.onset.onset_detect(y=audio, sr=sr)
-
-        # Start the audio analysis loop
-        current_frame = 0
-        while current_frame < len(onsets):
-            # Check if a new onset event has occurred
-            if pygame.mixer.music.get_pos() >= onsets[current_frame] * 1000:  
-                # Trigger event
-                onset_queue.put(True)
-                current_frame += 1  
-                print(onset_queue)
-
-            # Small delay to avoid high CPU usage
-            time.sleep(0.01)
-
-    # Start the audio analysis thread
-    audio_thread = threading.Thread(target=audio_analysis_thread)
-    audio_thread.start()
+    return onset_times
 
 def mainMenu():
+    pygame.init()
+    screen = pygame.display.set_mode((800, 600))
+    clock = pygame.time.Clock()
+    
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -77,8 +57,11 @@ def mainMenu():
         mouse_click = pygame.mouse.get_pressed()
 
         if start_button.collidepoint(mouse_pos) and mouse_click[0] == 1:
-            start_audio_analysis()
-            gameLoop()
+            onsets = populate_onset_stack(music_path)
+            beats = populate_beat_stack(music_path)
+            pygame.mixer.music.load(music_path)
+            pygame.mixer.music.play()
+            gameLoop(beats, onsets)
 
         if song_button.collidepoint(mouse_pos) and mouse_click[0] == 1:
             root = tk.Tk()
@@ -94,7 +77,7 @@ def mainMenu():
         pygame.display.flip()
         clock.tick(60)
 
-def gameLoop():
+def gameLoop(beats, onsets):
 
     LIVES = 9
     SCREENWIDTH = 700
@@ -102,11 +85,11 @@ def gameLoop():
     MOVEMENTSPEED = 800
     SPEEDMULTIPLIER = 0.6
     ENEMYUPDATEDELAY = 5000
-    PROJECTILERADIUS = 5
     PROJECTILESPEED = 4
     GRAVITY = .2
     RED = (255, 0, 0)
     YELLOW = (255, 255, 0)
+    GREEN = (0,255,0)
     PURPLE = (255, 0, 255)
         
     pygame.init()
@@ -128,19 +111,21 @@ def gameLoop():
             pygame.draw.circle(surface=self.screen, color=self.playerColor, center=(self.playerLocX, self.playerLocY), radius=self.playerRadius)
 
     class Projectile:
-        def __init__(self, x, y, initial_speed_x, initial_speed_y):
+        def __init__(self, x, y, initial_speed_x, initial_speed_y, color, radius):
             self.x = x
             self.y = y
             self.speedY = initial_speed_y
             self.speedX = initial_speed_x
             self.gravity = GRAVITY
+            self.color = color
+            self.radius = radius
 
         def update(self):
             self.x += self.speedX
             self.y += self.speedY
 
         def draw(self, screen, radius):
-            pygame.draw.circle(screen, YELLOW, (self.x, self.y), radius)
+            pygame.draw.circle(screen, self.color, (self.x, self.y), radius)
 
     class Enemy(pygame.sprite.Sprite):
         def __init__(self, screen, enemyRadius, enemyColor):
@@ -178,10 +163,10 @@ def gameLoop():
                 generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
                 
         def attackOnset(self):
-            generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
+            generateCircularProjectiles(projectiles, projectile_count=9, projectile_radius=20, sourceX=self.position[0], sourceY=self.position[1], angle=60, color=YELLOW)
             
-        def onset_detected(self):
-            self.attackOnset()
+        def attackBeat(self):
+            generateCircularProjectiles(projectiles, projectile_count=16, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0, color=PURPLE)
                         
         def draw(self):
             pygame.draw.circle(surface=self.screen, color=self.color, center=(self.position[0], self.position[1]), radius=self.radius)
@@ -210,7 +195,7 @@ def gameLoop():
         if player1.playerLocY > SCREENHEIGHT - player1.playerRadius:
             player1.playerLocY = SCREENHEIGHT - player1.playerRadius
 
-    def generateCircularProjectiles(projectiles, projectile_count, projectile_radius, sourceX, sourceY, angle):
+    def generateCircularProjectiles(projectiles, projectile_count, projectile_radius, sourceX, sourceY, angle, color):
         angle_increment = 2 * math.pi / projectile_count
         current_angle = angle
 
@@ -218,7 +203,7 @@ def gameLoop():
             direction_x = math.cos(current_angle) * PROJECTILESPEED
             direction_y = math.sin(current_angle) * PROJECTILESPEED
 
-            new_projectile = Projectile(sourceX, sourceY, direction_x, direction_y)
+            new_projectile = Projectile(sourceX, sourceY, direction_x, direction_y, color=color, radius=projectile_radius)
             projectiles.append(new_projectile)
 
             current_angle += angle_increment
@@ -242,22 +227,30 @@ def gameLoop():
 
     def drawProjectiles():
         for projectile in projectiles:
-            projectile.draw(screen, PROJECTILERADIUS)
+            projectile.draw(screen, projectile.radius)
             projectile.update()
-            
+                     
     projectiles = []
     player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
+    
     game_over = False
     game_over_timer = 0
     game_over_duration = 5000
+    
     default_font = pygame.font.Font(pygame.font.get_default_font(), 75)
     game_over_text = default_font.render('GAME OVER', True, (255, 255, 255))
     start_time = pygame.time.get_ticks()
-    attack_start_time = pygame.time.get_ticks()
+    
     gameTimeThing = True # goofy hack for game over condition
-    enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=PURPLE)
+    
+    enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=GREEN)
     hitsound = pygame.mixer.Sound('hitsound.mp3')
-
+    
+    attack_start_time_ms = pygame.time.get_ticks()
+    onset_index = 0
+    beat_index = 0
+    last_onset = 0
+    last_beat = 0
 
     # main loop---------------------------------------------------------------------------------------------------------------------------------------------------
     while running:
@@ -272,7 +265,7 @@ def gameLoop():
         
     # hit detection
         for projectile in projectiles:
-            if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, PROJECTILERADIUS):
+            if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, projectile.radius):
                 projectiles.remove(projectile)
                 LIVES -= 1
                 hitsound.play()
@@ -298,11 +291,20 @@ def gameLoop():
             start_time = enemy_current_time
         
     # ememy attacks
-        # attack_current_time = pygame.time.get_ticks()
-        # if attack_current_time - attack_start_time >= 1:
-        #     # enemy.attackBasic()
-        #     attack_start_time = attack_current_time
-        
+        onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
+        if onset_current_time >= (onsets[onset_index] * 1000):
+            enemy.attackOnset()
+            print(f'onsettime: {onsets[onset_index]} currentTime: {onset_current_time} last_onset: {last_onset}')
+            last_onset = onset_current_time
+            onset_index += 1
+            
+        beat_current_time = pygame.time.get_ticks() - attack_start_time_ms
+        if beat_current_time >= (beats[beat_index] * 1000):
+            enemy.attackBeat()
+            print(f'beattime: {beats[beat_index]} currentTime: {beat_current_time} last_beat: {last_beat}')
+            last_beat = beat_current_time
+            beat_index += 1
+  
         enemy.update()
         enemy.draw()
 
