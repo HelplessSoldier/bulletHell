@@ -7,42 +7,20 @@ from typing import Any
 import random
 import math
 import threading
-import aubio
+import librosa
+import queue
+import time
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))
 clock = pygame.time.Clock()
 
-# Constants for frequency ranges
-BASS_RANGE = (20, 250)  # Modify as needed
-MIDS_RANGE = (250, 4000)  # Modify as needed
-HIGHS_RANGE = (4000, 20000)  # Modify as needed
-
-# Constants for event thresholds
-BASS_THRESHOLD = 0.1  # Modify as needed
-MIDS_THRESHOLD = 0.05  # Modify as needed
-HIGHS_THRESHOLD = 0.0  # Modify as needed
-
-# Event constants
-BASS_EVENT = 'BassEvent'
-MIDS_EVENT = 'MidsEvent'
-HIGHS_EVENT = 'HighsEvent'
-
-# Event handlers (replace with your own code)
-def handle_bass_event():
-    print("Bass event detected!")
-
-def handle_mids_event():
-    print("Mids event detected!")
-
-def handle_highs_event():
-    print("Highs event detected!")
-
+onset_queue = queue.Queue()
 def start_audio_analysis():
     def audio_analysis_thread():
-        # Load the audio file (replace with your own audio source)
+        # Load the audio file TODO: make this user input via 'select song'
         audio_file = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
-        
+
         # Initialize pygame and the mixer for audio playback
         pygame.mixer.init()
 
@@ -50,48 +28,24 @@ def start_audio_analysis():
         pygame.mixer.music.load(audio_file)
         pygame.mixer.music.play()
 
-        # Create the Aubio source
-        samplerate, hop_size = 0, 256  # Adjust hop size as needed
-        aubio_source = aubio.source(audio_file, samplerate, hop_size)
+        # Load audio with Librosa
+        audio, sr = librosa.load(audio_file)
 
-        # Create the Aubio pitch object for volume analysis
-        aubio_pitch = aubio.pitch("default", hop_size, hop_size, samplerate)
+        # Detect onsets using Librosa
+        onsets = librosa.onset.onset_detect(y=audio, sr=sr)
 
         # Start the audio analysis loop
-        while True:
-            samples, read = aubio_source()
+        current_frame = 0
+        while current_frame < len(onsets):
+            # Check if a new onset event has occurred
+            if pygame.mixer.music.get_pos() >= onsets[current_frame] * 1000:  
+                # Trigger event
+                onset_queue.put(True)
+                current_frame += 1  
+                print(onset_queue)
 
-            # Calculate the volume levels in each frequency range
-            bass_volume = 0
-            mids_volume = 0
-            highs_volume = 0
-
-            if read > 0:
-                # Calculate the pitch for volume analysis
-                pitch = aubio_pitch(samples)[0]
-
-                # Calculate the frequency ranges of interest
-                if pitch >= BASS_RANGE[0] and pitch <= BASS_RANGE[1]:
-                    bass_volume = max(samples)
-                    print(bass_volume)
-
-                if pitch >= MIDS_RANGE[0] and pitch <= MIDS_RANGE[1]:
-                    mids_volume = max(samples)
-                    print(mids_volume)
-
-                if pitch >= HIGHS_RANGE[0] and pitch <= HIGHS_RANGE[1]:
-                    highs_volume = max(samples)
-                    print(highs_volume)
-
-            # Trigger events based on volume thresholds
-            if bass_volume > BASS_THRESHOLD:
-                handle_bass_event()
-
-            if mids_volume > MIDS_THRESHOLD:
-                handle_mids_event()
-
-            if highs_volume > HIGHS_THRESHOLD:
-                handle_highs_event()
+            # Small delay to avoid high CPU usage
+            time.sleep(0.01)
 
     # Start the audio analysis thread
     audio_thread = threading.Thread(target=audio_analysis_thread)
@@ -223,15 +177,12 @@ def gameLoop():
                 self.last_attack_time = current_time
                 generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
                 
-        def attackBass(self):
-            pass
-        
-        def attackMids(self):
-            pass
-        
-        def attackHighs(self):
-            pass
-                
+        def attackOnset(self):
+            generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
+            
+        def onset_detected(self):
+            self.attackOnset()
+                        
         def draw(self):
             pygame.draw.circle(surface=self.screen, color=self.color, center=(self.position[0], self.position[1]), radius=self.radius)
 
@@ -347,11 +298,11 @@ def gameLoop():
             start_time = enemy_current_time
         
     # ememy attacks
-        attack_current_time = pygame.time.get_ticks()
-        if attack_current_time - attack_start_time >= 1:
-            enemy.attackBasic()
-            attack_start_time = attack_current_time
-
+        # attack_current_time = pygame.time.get_ticks()
+        # if attack_current_time - attack_start_time >= 1:
+        #     # enemy.attackBasic()
+        #     attack_start_time = attack_current_time
+        
         enemy.update()
         enemy.draw()
 
