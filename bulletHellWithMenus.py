@@ -1,4 +1,3 @@
-import numpy as np
 import pygame.mixer
 import pygame
 import tkinter as tk
@@ -6,12 +5,9 @@ from tkinter import filedialog
 from typing import Any
 import random
 import math
-import threading
 import librosa
-import queue
-import time
 
-music_path = '/home/patrick/Desktop/my_github_repos/bulletHell/cYsmix_theBalladOfAMindlessGirl.mp3'
+music_path = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
 
 def populate_beat_stack(audio_path):
     waveform, sample_rate = librosa.load(audio_path)
@@ -166,7 +162,7 @@ def gameLoop(beats, onsets):
             generateCircularProjectiles(projectiles, projectile_count=9, projectile_radius=20, sourceX=self.position[0], sourceY=self.position[1], angle=random.randint(0,360), color=YELLOW)
             
         def attackBeat(self):
-            generateCircularProjectiles(projectiles, projectile_count=16, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0, color=PURPLE)
+            generateCircularProjectiles(projectiles, projectile_count=16, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0, color=GREEN)
                         
         def draw(self):
             pygame.draw.circle(surface=self.screen, color=self.color, center=(self.position[0], self.position[1]), radius=self.radius)
@@ -236,7 +232,7 @@ def gameLoop(beats, onsets):
     
     game_over = False
     game_over_timer = 0
-    game_over_duration = 5000
+    game_over_duration = 3000
     
     default_font = pygame.font.Font(pygame.font.get_default_font(), 75)
     game_over_text = default_font.render('GAME OVER', True, (255, 255, 255))
@@ -244,14 +240,12 @@ def gameLoop(beats, onsets):
     
     gameTimeThing = True # goofy hack for game over condition
     
-    enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=GREEN)
+    enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=PURPLE)
     hitsound = pygame.mixer.Sound('hitsound.mp3')
     
     attack_start_time_ms = pygame.time.get_ticks()
     onset_index = 0
     beat_index = 0
-    last_onset = 0
-    last_beat = 0
 
     # main loop---------------------------------------------------------------------------------------------------------------------------------------------------
     while running:
@@ -262,14 +256,18 @@ def gameLoop(beats, onsets):
         playerInput(MOVEMENTSPEED)
         playerScreenLock(player1)
         screen.fill((0, 0, 0))  
-        drawLives(LIVES)    
         
-    # hit detection
+    # hit detection and kill projectile on exiting screen
         for projectile in projectiles:
             if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, projectile.radius):
                 projectiles.remove(projectile)
                 LIVES -= 1
                 hitsound.play()
+            if (projectile.x < -100 
+                or projectile.x > SCREENWIDTH + 100 
+                or projectile.y < -100 
+                or projectile.y > SCREENHEIGHT + 100):
+                projectiles.remove(projectile)
     
     # game over condition  
         if LIVES <= 0:
@@ -306,11 +304,12 @@ def gameLoop(beats, onsets):
             last_beat = beat_current_time
             beat_index += 1
   
+        drawProjectiles()
+        drawLives(LIVES)    
+        
         enemy.update()
         enemy.draw()
-
-        drawProjectiles()
-
+        
         player1.draw() 
         pygame.display.flip()
         
