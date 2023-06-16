@@ -107,6 +107,7 @@ def gameLoop(beats, onsets):
     YELLOW = (255, 255, 0)
     GREEN = (0,255,0)
     ENEMYCOLOR = (255, 0, 255)
+    SCORE = 0
         
     pygame.init()
     pygame.mixer.init()
@@ -234,9 +235,9 @@ def gameLoop(beats, onsets):
 
             current_angle += angle_increment
 
-    def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projectileRadius):
-        distance = math.sqrt((playerX - projectileX) ** 2 + (playerY - projectileY) ** 2)
-        threshold = (playerRadius * 0.2) + projectileRadius
+    def hitDetected(targetX, targetY, targetRadius, projectileX, projectileY, projectileRadius, threshold_var):
+        distance = math.sqrt((targetX - projectileX) ** 2 + (targetY - projectileY) ** 2)
+        threshold = (targetRadius * threshold_var) + projectileRadius
         # threshold = projectileRadius
         if threshold > distance:
             return True
@@ -260,91 +261,133 @@ def gameLoop(beats, onsets):
         for playerProjectile in playerProjectiles:
             playerProjectile.draw(screen, playerProjectile.radius)
             playerProjectile.update()
-                     
+                                          
     projectiles = []
     playerProjectiles = []
     player1 = Player(screen, 10, PLAYERCOLOR, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9), 0)
     
     game_over = False
     game_over_timer = 0
-    game_over_duration = 3000
+    game_over_duration = 5000
     
     default_font = pygame.font.Font(pygame.font.get_default_font(), 75)
+    final_score_font = pygame.font.Font(pygame.font.get_default_font(), 50)
+    current_score_font = pygame.font.Font(pygame.font.get_default_font(), 25)
     game_over_text = default_font.render('GAME OVER', True, (255, 255, 255))
     start_time = pygame.time.get_ticks()
+    win_text = default_font.render('STAGE CLEAR!', True, (255, 255, 255))
     
     gameTimeThing = True # goofy hack for game over condition
     
     enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=ENEMYCOLOR)
     hitsound = pygame.mixer.Sound('hitsound.mp3')
+    enemyHitsound = pygame.mixer.Sound('enemyHit.mp3')
     
     attack_start_time_ms = pygame.time.get_ticks()
     onset_index = 0
     beat_index = 0
+    onsetsLength = len(onsets) - 1
+    beatsLength = len(beats) - 1
+
+    final_score = 0
+    win_condition = False
 
     # main loop---------------------------------------------------------------------------------------------------------------------------------------------------
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+                
+        if onset_index >= onsetsLength or beat_index >= beatsLength:
+            game_over = True
+            win_condition = True
         
-        playerInput(MOVEMENTSPEED, player1)
-        playerScreenLock(player1)
-        screen.fill((0, 0, 0))  
-        
-    # hit detection and kill projectile on exiting screen
-        for projectile in projectiles:
-            if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, projectile.radius):
-                projectiles.remove(projectile)
-                LIVES -= 1
-                hitsound.play()
-            if (projectile.x < -100 
-                or projectile.x > SCREENWIDTH + 100 
-                or projectile.y < -100 
-                or projectile.y > SCREENHEIGHT + 100):
-                projectiles.remove(projectile)
+        if not game_over:
+            playerInput(MOVEMENTSPEED, player1)
+            playerScreenLock(player1)
+            screen.fill((0, 0, 0))  
+            
+        # hit detection and kill projectile on exiting screen
+            for projectile in projectiles:
+                if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, projectile.radius, 0.2):
+                    projectiles.remove(projectile)
+                    LIVES -= 1
+                    hitsound.play()
+                if (projectile.x < -100 
+                    or projectile.x > SCREENWIDTH + 100 
+                    or projectile.y < -100 
+                    or projectile.y > SCREENHEIGHT + 100):
+                    projectiles.remove(projectile)
+                    
+        # enemy hit detection
+            for projectile in playerProjectiles:
+                if hitDetected(enemy.position[0], enemy.position[1], enemy.radius, projectile.x, projectile.y, projectile.radius, 1):
+                    playerProjectiles.remove(projectile)
+                    SCORE += 100
+                    enemyHitsound.play()
+                if (projectile.x < -100 
+                    or projectile.x > SCREENWIDTH + 100 
+                    or projectile.y < -100 
+                    or projectile.y > SCREENHEIGHT + 100):
+                    playerProjectiles.remove(projectile)
+            
+
+        # enemy movement
+            enemy_current_time = pygame.time.get_ticks()
+            if enemy_current_time - start_time >= ENEMYUPDATEDELAY:
+                enemy.target = pygame.Vector2(random.randint(50, SCREENWIDTH - 50), random.randint(100, SCREENHEIGHT * 0.3))
+                start_time = enemy_current_time
+            
+        # ememy attacks
+            onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
+            if onset_current_time >= (onsets[onset_index] * 1000):
+                enemy.attackOnset()
+                onset_index += 1
+                
+            beat_current_time = pygame.time.get_ticks() - attack_start_time_ms
+            if beat_current_time >= (beats[beat_index] * 1000):
+                enemy.attackBeat()
+                beat_index += 1
+
     
+            drawProjectiles()
+            drawLives(LIVES)    
+            
+            enemy.update()
+            enemy.draw()
+            
+            player1.draw() 
+            
+            current_score_text = current_score_font.render(f'{SCORE}', True, (255, 255, 255), (0,0,0))
+            screen.blit(current_score_text, (SCREENWIDTH - current_score_text.get_width(), SCREENHEIGHT - current_score_text.get_height()))
+            
+            if LIVES <= 0:
+                game_over = True
+        
     # game over condition  
-        if LIVES <= 0:
+        else:
+            screen.fill((0,0,0))
+            
+            if win_condition:
+                screen.blit(win_text, (SCREENWIDTH // 2 - win_text.get_width() // 2, SCREENHEIGHT // 2 - win_text.get_height() // 2))
+            else:
+                screen.blit(game_over_text, (SCREENWIDTH // 2 - game_over_text.get_width() // 2, SCREENHEIGHT // 2 - game_over_text.get_height() // 2))
+                
+            final_score_text = final_score_font.render(f'Final score: {final_score}', True, (255, 255, 255))
+            screen.blit(final_score_text, (SCREENWIDTH // 2 - final_score_text.get_width() // 2, SCREENHEIGHT // 2 - final_score_text.get_height() // 2 + 100))
             current_time = pygame.time.get_ticks()
-            screen.blit(game_over_text, (SCREENWIDTH // 2 - game_over_text.get_width() // 2, SCREENHEIGHT // 2 - game_over_text.get_height() // 2))
-            elapsed_time_text = default_font.render("TIME: " + str((current_time - start_time)//1000) + " S", True, (255,255,255))
-            screen.blit(elapsed_time_text, (SCREENWIDTH // 2 - elapsed_time_text.get_width() // 2, 700))
+            # pygame.mixer.music.stop()
             
             if gameTimeThing:
+                final_score = SCORE
                 start_time = current_time
                 gameTimeThing= False
                 
             if current_time - start_time >= game_over_duration:
-                running = False 
-
-    # enemy movement
-        enemy_current_time = pygame.time.get_ticks()
-        if enemy_current_time - start_time >= ENEMYUPDATEDELAY:
-            enemy.target = pygame.Vector2(random.randint(50, SCREENWIDTH - 50), random.randint(100, SCREENHEIGHT * 0.3))
-            start_time = enemy_current_time
-        
-    # ememy attacks
-        onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
-        if onset_current_time >= (onsets[onset_index] * 1000):
-            enemy.attackOnset()
-            onset_index += 1
-            
-        beat_current_time = pygame.time.get_ticks() - attack_start_time_ms
-        if beat_current_time >= (beats[beat_index] * 1000):
-            enemy.attackBeat()
-            beat_index += 1
-            
-  
-        drawProjectiles()
-        drawLives(LIVES)    
-        
-        enemy.update()
-        enemy.draw()
-        
-        player1.draw() 
+                running = False
+                 
         pygame.display.flip()
-        
+                
         clock.tick(60)
         deltaTime = clock.tick(60) / 1000
         
