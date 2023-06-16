@@ -10,7 +10,7 @@ from threading import Thread
 import time
 import os
 
-music_path = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
+music_path = ''
 
 def populate_beat_stack(audio_path):
     waveform, sample_rate = librosa.load(audio_path)
@@ -33,7 +33,7 @@ def open_file_dialog():
 
     # Open the file dialog
     selected_music_path = filedialog.askopenfilename()
-    if selected_music_path:  # Check if a file was selected
+    if selected_music_path:  
         music_path = selected_music_path
 
 def mainMenu():
@@ -67,11 +67,19 @@ def mainMenu():
         mouse_click = pygame.mouse.get_pressed()
 
         if start_button.collidepoint(mouse_pos) and mouse_click[0] == 1:
-            onsets = populate_onset_stack(music_path)
-            beats = populate_beat_stack(music_path)
-            pygame.mixer.music.load(music_path)
-            pygame.mixer.music.play()
-            gameLoop(beats, onsets)
+            if music_path == '':
+                selectSongReminder = pygame.Rect(300, 300, 200, 50)
+                pygame.draw.rect(screen, (0, 0, 0), selectSongReminder)
+                selectSongReminderText = pygame.font.Font(None, 50).render('Please select a song.', True, (255, 255, 255))
+                screen.blit(selectSongReminderText, (225, 115))
+                pygame.display.flip()
+                pygame.time.wait(2000)
+            else:
+                onsets = populate_onset_stack(music_path)
+                beats = populate_beat_stack(music_path)
+                pygame.mixer.music.load(music_path)
+                pygame.mixer.music.play()
+                gameLoop(beats, onsets)
 
         if song_button.collidepoint(mouse_pos) and mouse_click[0] == 1:
             # Check if the file dialog thread is already running
@@ -93,6 +101,7 @@ def gameLoop(beats, onsets):
     SPEEDMULTIPLIER = 0.6
     ENEMYUPDATEDELAY = 5000
     PROJECTILESPEED = 4
+    PLAYERPROJECTILESPEED = 20
     GRAVITY = .2
     PLAYERCOLOR = (255, 0, 0)
     YELLOW = (255, 255, 0)
@@ -106,16 +115,21 @@ def gameLoop(beats, onsets):
     running = True
         
     class Player(pygame.sprite.Sprite):
-        def __init__(self, screen, playerRadius, playerColor, playerLocX, playerLocY):
+        def __init__(self, screen, playerRadius, playerColor, playerLocX, playerLocY, horizontalSpeed):
             super().__init__()
             self.screen = screen
             self.playerRadius = playerRadius
             self.playerColor = playerColor
             self.playerLocX = playerLocX
             self.playerLocY = playerLocY
+            self.horizontalSpeed = horizontalSpeed
 
         def draw(self):
             pygame.draw.circle(surface=self.screen, color=self.playerColor, center=(self.playerLocX, self.playerLocY), radius=self.playerRadius)
+            
+        def attack(self, horizontalSpeed):            
+            new_player_projectile = Projectile(self.playerLocX, self.playerLocY, horizontalSpeed, -PLAYERPROJECTILESPEED, PLAYERCOLOR, 5)
+            playerProjectiles.append(new_player_projectile)
 
     class Projectile:
         def __init__(self, x, y, initial_speed_x, initial_speed_y, color, radius):
@@ -134,6 +148,25 @@ def gameLoop(beats, onsets):
         def draw(self, screen, radius):
             pygame.draw.circle(screen, self.color, (self.x, self.y), radius)
 
+    def playerInput(speed, player):
+        MOVEMENTSPEED = speed
+        horizontalSpeed = 0
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_z]:
+            MOVEMENTSPEED = MOVEMENTSPEED * SPEEDMULTIPLIER
+        if keys[pygame.K_UP]:
+            player.playerLocY -= MOVEMENTSPEED * deltaTime
+        if keys[pygame.K_DOWN]:
+            player.playerLocY += MOVEMENTSPEED * deltaTime
+        if keys[pygame.K_LEFT]:
+            player.playerLocX -= MOVEMENTSPEED * deltaTime
+            horizontalSpeed = -MOVEMENTSPEED
+        if keys[pygame.K_RIGHT]:
+            player.playerLocX += MOVEMENTSPEED * deltaTime
+            horizontalSpeed = MOVEMENTSPEED
+        if keys[pygame.K_x]:
+            player.attack(horizontalSpeed= horizontalSpeed / 120)
+            
     class Enemy(pygame.sprite.Sprite):
         def __init__(self, screen, enemyRadius, enemyColor):
             super().__init__()
@@ -177,20 +210,6 @@ def gameLoop(beats, onsets):
                         
         def draw(self):
             pygame.draw.circle(surface=self.screen, color=self.color, center=(self.position[0], self.position[1]), radius=self.radius)
-
-    def playerInput(speed):
-        MOVEMENTSPEED = speed
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_z]:
-            MOVEMENTSPEED = MOVEMENTSPEED * SPEEDMULTIPLIER
-        if keys[pygame.K_UP]:
-            player1.playerLocY -= MOVEMENTSPEED * deltaTime
-        if keys[pygame.K_DOWN]:
-            player1.playerLocY += MOVEMENTSPEED * deltaTime
-        if keys[pygame.K_LEFT]:
-            player1.playerLocX -= MOVEMENTSPEED * deltaTime
-        if keys[pygame.K_RIGHT]:
-            player1.playerLocX += MOVEMENTSPEED * deltaTime
         
     def playerScreenLock(player1):
         if player1.playerLocX < (player1.playerRadius):
@@ -237,9 +256,14 @@ def gameLoop(beats, onsets):
         for projectile in projectiles:
             projectile.draw(screen, projectile.radius)
             projectile.update()
+            
+        for playerProjectile in playerProjectiles:
+            playerProjectile.draw(screen, playerProjectile.radius)
+            playerProjectile.update()
                      
     projectiles = []
-    player1 = Player(screen, 10, PLAYERCOLOR, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
+    playerProjectiles = []
+    player1 = Player(screen, 10, PLAYERCOLOR, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9), 0)
     
     game_over = False
     game_over_timer = 0
@@ -264,7 +288,7 @@ def gameLoop(beats, onsets):
             if event.type == pygame.QUIT:
                 running = False
         
-        playerInput(MOVEMENTSPEED)
+        playerInput(MOVEMENTSPEED, player1)
         playerScreenLock(player1)
         screen.fill((0, 0, 0))  
         
@@ -310,6 +334,7 @@ def gameLoop(beats, onsets):
         if beat_current_time >= (beats[beat_index] * 1000):
             enemy.attackBeat()
             beat_index += 1
+            
   
         drawProjectiles()
         drawLives(LIVES)    
