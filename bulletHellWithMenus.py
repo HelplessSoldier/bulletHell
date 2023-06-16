@@ -6,6 +6,9 @@ from typing import Any
 import random
 import math
 import librosa
+from threading import Thread
+import time
+import os
 
 music_path = '/home/patrick/Desktop/my_github_repos/bulletHell/camellia_bleedBlood.mp3'
 
@@ -23,11 +26,22 @@ def populate_onset_stack(audio_path):
 
     return onset_times
 
+def open_file_dialog():
+    global music_path
+    root = tk.Tk()
+    root.withdraw()
+
+    # Open the file dialog
+    selected_music_path = filedialog.askopenfilename()
+    if selected_music_path:  # Check if a file was selected
+        music_path = selected_music_path
+
 def mainMenu():
     pygame.init()
     screen = pygame.display.set_mode((800, 600))
     clock = pygame.time.Clock()
-    
+    file_dialog_thread = None    
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -60,15 +74,12 @@ def mainMenu():
             gameLoop(beats, onsets)
 
         if song_button.collidepoint(mouse_pos) and mouse_click[0] == 1:
-            root = tk.Tk()
-            root.withdraw()
+            # Check if the file dialog thread is already running
+            if file_dialog_thread and file_dialog_thread.is_alive():
+                continue
 
-            # Open the file dialog
-            file_path = filedialog.askopenfilename()
-            if file_path:
-                # Set the selected song
-                global selected_song
-                selected_song = pygame.mixer.Sound(file_path)
+            file_dialog_thread = Thread(target=open_file_dialog)
+            file_dialog_thread.start()
 
         pygame.display.flip()
         clock.tick(60)
@@ -83,10 +94,10 @@ def gameLoop(beats, onsets):
     ENEMYUPDATEDELAY = 5000
     PROJECTILESPEED = 4
     GRAVITY = .2
-    RED = (255, 0, 0)
+    PLAYERCOLOR = (255, 0, 0)
     YELLOW = (255, 255, 0)
     GREEN = (0,255,0)
-    PURPLE = (255, 0, 255)
+    ENEMYCOLOR = (255, 0, 255)
         
     pygame.init()
     pygame.mixer.init()
@@ -206,8 +217,8 @@ def gameLoop(beats, onsets):
 
     def hitDetected(playerX, playerY, playerRadius, projectileX, projectileY, projectileRadius):
         distance = math.sqrt((playerX - projectileX) ** 2 + (playerY - projectileY) ** 2)
-        # threshold = playerRadius + projectileRadius
-        threshold = projectileRadius
+        threshold = (playerRadius * 0.2) + projectileRadius
+        # threshold = projectileRadius
         if threshold > distance:
             return True
         else:
@@ -228,7 +239,7 @@ def gameLoop(beats, onsets):
             projectile.update()
                      
     projectiles = []
-    player1 = Player(screen, 10, RED, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
+    player1 = Player(screen, 10, PLAYERCOLOR, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9))
     
     game_over = False
     game_over_timer = 0
@@ -240,7 +251,7 @@ def gameLoop(beats, onsets):
     
     gameTimeThing = True # goofy hack for game over condition
     
-    enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=PURPLE)
+    enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=ENEMYCOLOR)
     hitsound = pygame.mixer.Sound('hitsound.mp3')
     
     attack_start_time_ms = pygame.time.get_ticks()
@@ -293,15 +304,11 @@ def gameLoop(beats, onsets):
         onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
         if onset_current_time >= (onsets[onset_index] * 1000):
             enemy.attackOnset()
-            # print(f'onsettime: {onsets[onset_index]} currentTime: {onset_current_time} last_onset: {last_onset}')
-            last_onset = onset_current_time
             onset_index += 1
             
         beat_current_time = pygame.time.get_ticks() - attack_start_time_ms
         if beat_current_time >= (beats[beat_index] * 1000):
             enemy.attackBeat()
-            # print(f'beattime: {beats[beat_index]} currentTime: {beat_current_time} last_beat: {last_beat}')
-            last_beat = beat_current_time
             beat_index += 1
   
         drawProjectiles()
