@@ -12,6 +12,41 @@ import os
 
 music_path = ''
 
+def audio_time_magnitude(audio_file):
+    y, sr = librosa.load(audio_file)
+
+    # Extract the frequency components using a Short-Time Fourier Transform (STFT)
+    D = librosa.stft(y)
+
+    # Split the frequency components into bass, mids, and highs ranges
+    frequencies = librosa.fft_frequencies(sr=sr)
+    bass_range = (20, 140)
+    mids_range = (140, 4000)
+    highs_range = (4000, frequencies.max())
+
+    # Convert the frequency ranges to corresponding bins
+    bass_bins = librosa.core.fft_frequencies(sr=sr, n_fft=D.shape[0]).searchsorted(bass_range)
+    mids_bins = librosa.core.fft_frequencies(sr=sr, n_fft=D.shape[0]).searchsorted(mids_range)
+    highs_bins = librosa.core.fft_frequencies(sr=sr, n_fft=D.shape[0]).searchsorted(highs_range)
+
+    # Compute the magnitude spectrum
+    magnitude = librosa.amplitude_to_db(abs(D))
+
+    # Calculate the mean magnitude within each frequency range
+    bass_magnitude = abs(magnitude[bass_bins[0]:bass_bins[1]].mean(axis=0))
+    mids_magnitude = abs(magnitude[mids_bins[0]:mids_bins[1]].mean(axis=0))
+    highs_magnitude = abs(magnitude[highs_bins[0]:highs_bins[1]].mean(axis=0))
+
+    # Get the time information
+    frames = librosa.frames_to_time(range(magnitude.shape[1]), sr=sr)
+
+    # Create a tuple of (time, magnitude) for each frequency range
+    bass_data = list(zip(frames, bass_magnitude))
+    mids_data = list(zip(frames, mids_magnitude))
+    highs_data = list(zip(frames, highs_magnitude))
+
+    return bass_data, mids_data, highs_data
+
 def populate_beat_stack(audio_path):
     waveform, sample_rate = librosa.load(audio_path)
     tempo, beat_frames = librosa.beat.beat_track(y=waveform, sr=sample_rate)
@@ -288,6 +323,16 @@ def gameLoop(beats, onsets):
     beat_index = 0
     onsetsLength = len(onsets) - 1
     beatsLength = len(beats) - 1
+    
+    bass, mids, highs = audio_time_magnitude(music_path)
+    
+    bass_index = 0
+    mids_index = 0
+    highs_index = 0
+    
+    bass_value = 0
+    mids_value = 0
+    highs_value = 0
 
     final_score = 0
     win_condition = False
@@ -339,15 +384,26 @@ def gameLoop(beats, onsets):
                 start_time = enemy_current_time
             
         # ememy attacks
-            onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
-            if onset_current_time >= (onsets[onset_index] * 1000):
-                enemy.attackOnset()
-                onset_index += 1
-                
-            beat_current_time = pygame.time.get_ticks() - attack_start_time_ms
-            if beat_current_time >= (beats[beat_index] * 1000):
+            value_current_time = pygame.time.get_ticks() - attack_start_time_ms
+            if value_current_time >= (bass[bass_index][0] * 1000):
+                bass_value = bass[bass_index][1]
+                bass_index += 1
+            if value_current_time >= (mids[mids_index][0] * 1000):
+                mids_value = mids[bass_index][1]
+                mids_index += 1
+            if value_current_time >= (highs[highs_index][0] * 1000):
+                highs_value = highs[highs_index][1]
+                highs_index += 1
+        
+            if value_current_time >= (beats[beat_index] * 1000):
                 enemy.attackBeat()
                 beat_index += 1
+                
+            # onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
+            # if onset_current_time >= (onsets[onset_index] * 1000):
+            #     enemy.attackOnset()
+            #     onset_index += 1
+                
 
     
             drawProjectiles()
