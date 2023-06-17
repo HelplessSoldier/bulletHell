@@ -21,8 +21,8 @@ def audio_time_magnitude(audio_file):
     # Split the frequency components into bass, mids, and highs ranges
     frequencies = librosa.fft_frequencies(sr=sr)
     bass_range = (20, 140)
-    mids_range = (140, 4000)
-    highs_range = (4000, frequencies.max())
+    mids_range = (140, 2000)
+    highs_range = (2000, frequencies.max())
 
     # Convert the frequency ranges to corresponding bins
     bass_bins = librosa.core.fft_frequencies(sr=sr, n_fft=D.shape[0]).searchsorted(bass_range)
@@ -143,6 +143,11 @@ def gameLoop(beats, onsets):
     GREEN = (0,255,0)
     ENEMYCOLOR = (255, 0, 255)
     SCORE = 0
+    VOLUMETHRESHOLD = 5
+    
+    BASSMULTIPLIER = .8
+    MIDSMULTIPLIER = 1
+    HIGHSMULTIPLIER = 1
         
     pygame.init()
     pygame.mixer.init()
@@ -238,10 +243,40 @@ def gameLoop(beats, onsets):
                 self.last_attack_time = current_time
                 generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
                 
+        def attackBass(self, value):
+            generateCircularProjectiles(projectiles, 
+                                        projectile_count= 8, 
+                                        projectile_radius= int(value), 
+                                        sourceX= self.position[0], 
+                                        sourceY= self.position[1], 
+                                        angle= 360 * (value/32), 
+                                        color= ((255 * (value/50)),(0),((255 * (value/50)))))
+        
+        def attackMids(self, value):
+            generateCircularProjectiles(projectiles, 
+                                        projectile_count= int(value) // 2, 
+                                        projectile_radius= 10, 
+                                        sourceX= self.position[0], 
+                                        sourceY= self.position[1], 
+                                        angle= 360 * (value/32), 
+                                        color= ((0),(255 * (value/50)),((255 * (value/50)))))
+        
+        def attackHighs(self, value):
+            output_color = 120 + (value / 32) * (255 - 120)
+            output_color = min(output_color, 255)
+            
+            generateCircularProjectiles(projectiles,
+                                        projectile_count=int(value),
+                                        projectile_radius= 5,
+                                        sourceX= self.position[0],
+                                        sourceY= self.position[1],
+                                        angle=0,
+                                        color=(output_color,output_color,output_color))
+                
         def attackOnset(self):
             generateCircularProjectiles(projectiles, projectile_count=9, projectile_radius=20, sourceX=self.position[0], sourceY=self.position[1], angle=random.randint(0,360), color=YELLOW)
             
-        def attackBeat(self):
+        def attackBeat(self, value):
             generateCircularProjectiles(projectiles, projectile_count=16, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0, color=GREEN)
                         
         def draw(self):
@@ -394,9 +429,17 @@ def gameLoop(beats, onsets):
             if value_current_time >= (highs[highs_index][0] * 1000):
                 highs_value = highs[highs_index][1]
                 highs_index += 1
-        
-            if value_current_time >= (beats[beat_index] * 1000):
-                enemy.attackBeat()
+
+            if max(bass_value * BASSMULTIPLIER, mids_value * MIDSMULTIPLIER, highs_value * HIGHSMULTIPLIER) > VOLUMETHRESHOLD:
+                if value_current_time >= (beats[beat_index] * 1000):
+                    if bass_value * BASSMULTIPLIER > mids_value * MIDSMULTIPLIER and bass_value * BASSMULTIPLIER > highs_value * HIGHSMULTIPLIER:
+                        enemy.attackBass(bass_value * BASSMULTIPLIER)
+                    elif mids_value * MIDSMULTIPLIER > highs_value * HIGHSMULTIPLIER and mids_value * MIDSMULTIPLIER > bass_value:
+                        enemy.attackMids(mids_value * MIDSMULTIPLIER)
+                    else:
+                        enemy.attackHighs(highs_value * HIGHSMULTIPLIER)
+                    beat_index += 1
+            else:
                 beat_index += 1
                 
             # onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
