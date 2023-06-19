@@ -24,7 +24,6 @@ def audio_time_magnitude(audio_file):
     mids_range = (140, 2000)
     highs_range = (2000, frequencies.max())
 
-    # Convert the frequency ranges to corresponding bins
     bass_bins = librosa.core.fft_frequencies(sr=sr, n_fft=D.shape[0]).searchsorted(bass_range)
     mids_bins = librosa.core.fft_frequencies(sr=sr, n_fft=D.shape[0]).searchsorted(mids_range)
     highs_bins = librosa.core.fft_frequencies(sr=sr, n_fft=D.shape[0]).searchsorted(highs_range)
@@ -47,6 +46,40 @@ def audio_time_magnitude(audio_file):
 
     return bass_data, mids_data, highs_data
 
+def smoothData(array, smoothingFactor):
+    smoothed_array = []
+    num_points = len(array)
+    for i in range(num_points):
+        if i < smoothingFactor // 2:
+            # Not enough previous points to calculate average
+            smoothed_value = array[i][1]
+        elif i >= num_points - smoothingFactor // 2:
+            # Not enough subsequent points to calculate average
+            smoothed_value = array[i][1]
+        else:
+            # Calculate the moving average
+            start_index = i - smoothingFactor // 2
+            end_index = i + smoothingFactor // 2
+            values = [array[j][1] for j in range(start_index, end_index + 1)]
+            smoothed_value = sum(values) / smoothingFactor
+        
+        smoothed_array.append((array[i][0], smoothed_value))
+    
+    return smoothed_array
+
+def equalizeArrays(array1, array2, array3):
+    maxValue = 100
+    
+    array1Multi = maxValue / max(x[1] for x in array1 if x[1] != maxValue)
+    array2Multi = maxValue / max(x[1] for x in array2 if x[1] != maxValue)
+    array3Multi = maxValue / max(x[1] for x in array3 if x[1] != maxValue)
+    
+    newArray1 = [(x[0], x[1] * array1Multi) for x in array1]
+    newArray2 = [(x[0], x[1] * array2Multi) for x in array2]
+    newArray3 = [(x[0], x[1] * array3Multi) for x in array3]
+
+    return newArray1, newArray2, newArray3
+
 def populate_beat_stack(audio_path):
     waveform, sample_rate = librosa.load(audio_path)
     tempo, beat_frames = librosa.beat.beat_track(y=waveform, sr=sample_rate)
@@ -66,7 +99,6 @@ def open_file_dialog():
     root = tk.Tk()
     root.withdraw()
 
-    # Open the file dialog
     selected_music_path = filedialog.askopenfilename()
     if selected_music_path:  
         music_path = selected_music_path
@@ -129,7 +161,7 @@ def mainMenu():
 
 def gameLoop(beats, onsets):
 
-    LIVES = 9
+    LIVES = 9001
     SCREENWIDTH = 700
     SCREENHEIGHT = 900
     MOVEMENTSPEED = 800
@@ -141,13 +173,14 @@ def gameLoop(beats, onsets):
     PLAYERCOLOR = (255, 0, 0)
     YELLOW = (255, 255, 0)
     GREEN = (0,255,0)
+    RED = (255, 0, 0)
     ENEMYCOLOR = (255, 0, 255)
     SCORE = 0
-    VOLUMETHRESHOLD = 5
     
-    BASSMULTIPLIER = .8
-    MIDSMULTIPLIER = 1
-    HIGHSMULTIPLIER = 1
+    BASSVOLUMETHRESHOLD = 80
+    MIDSVOLUMETHRESHOLD = 60
+    HIGHSVOLUMETHRESHOLD = 50
+    TIMINGOFFSET = 0
         
     pygame.init()
     pygame.mixer.init()
@@ -246,27 +279,27 @@ def gameLoop(beats, onsets):
         def attackBass(self, value):
             generateCircularProjectiles(projectiles, 
                                         projectile_count= 8, 
-                                        projectile_radius= int(value), 
+                                        projectile_radius= int(value / 5), 
                                         sourceX= self.position[0], 
                                         sourceY= self.position[1], 
                                         angle= 360 * (value/32), 
-                                        color= ((255 * (value/50)),(0),((255 * (value/50)))))
+                                        color= RED)
         
         def attackMids(self, value):
             generateCircularProjectiles(projectiles, 
-                                        projectile_count= int(value) // 2, 
+                                        projectile_count= max(1, (int(value) // 4)), 
                                         projectile_radius= 10, 
                                         sourceX= self.position[0], 
                                         sourceY= self.position[1], 
                                         angle= 360 * (value/32), 
-                                        color= ((0),(255 * (value/50)),((255 * (value/50)))))
+                                        color= YELLOW)
         
         def attackHighs(self, value):
             output_color = 120 + (value / 32) * (255 - 120)
             output_color = min(output_color, 255)
-            
+
             generateCircularProjectiles(projectiles,
-                                        projectile_count=int(value),
+                                        projectile_count=max(abs(int(value / 10)), 1),
                                         projectile_radius= 5,
                                         sourceX= self.position[0],
                                         sourceY= self.position[1],
@@ -316,7 +349,6 @@ def gameLoop(beats, onsets):
 
     heart_image = pygame.image.load('heart.png')
     heart_width = 32
-    heart_height = 32
     def drawLives(lives):
         for i in range(lives):
             x = i * (heart_width + 5) 
@@ -337,7 +369,6 @@ def gameLoop(beats, onsets):
     player1 = Player(screen, 10, PLAYERCOLOR, (SCREENWIDTH / 2), (SCREENHEIGHT * 0.9), 0)
     
     game_over = False
-    game_over_timer = 0
     game_over_duration = 5000
     
     default_font = pygame.font.Font(pygame.font.get_default_font(), 75)
@@ -359,15 +390,13 @@ def gameLoop(beats, onsets):
     onsetsLength = len(onsets) - 1
     beatsLength = len(beats) - 1
     
-    bass, mids, highs = audio_time_magnitude(music_path)
+    smoothingFactor = 7
+    bassChoppy, midsChoppy, highsChoppy = audio_time_magnitude(music_path)
+    bass, mids, highs = equalizeArrays(smoothData(bassChoppy, smoothingFactor), smoothData(midsChoppy, smoothingFactor), smoothData(highsChoppy, smoothingFactor))
     
-    bass_index = 0
-    mids_index = 0
-    highs_index = 0
-    
-    bass_value = 0
-    mids_value = 0
-    highs_value = 0
+    bassIndex, midsIndex, highsIndex = 0, 0, 0 
+    bassValue, midsValue, highsValue = 0, 0, 0
+    search_range = 3
 
     final_score = 0
     win_condition = False
@@ -419,36 +448,51 @@ def gameLoop(beats, onsets):
                 start_time = enemy_current_time
             
         # ememy attacks
-            value_current_time = pygame.time.get_ticks() - attack_start_time_ms
-            if value_current_time >= (bass[bass_index][0] * 1000):
-                bass_value = bass[bass_index][1]
-                bass_index += 1
-            if value_current_time >= (mids[mids_index][0] * 1000):
-                mids_value = mids[bass_index][1]
-                mids_index += 1
-            if value_current_time >= (highs[highs_index][0] * 1000):
-                highs_value = highs[highs_index][1]
-                highs_index += 1
+            attackCurrentTime = pygame.time.get_ticks() - attack_start_time_ms
 
-            if max(bass_value * BASSMULTIPLIER, mids_value * MIDSMULTIPLIER, highs_value * HIGHSMULTIPLIER) > VOLUMETHRESHOLD:
-                if value_current_time >= (beats[beat_index] * 1000):
-                    if bass_value * BASSMULTIPLIER > mids_value * MIDSMULTIPLIER and bass_value * BASSMULTIPLIER > highs_value * HIGHSMULTIPLIER:
-                        enemy.attackBass(bass_value * BASSMULTIPLIER)
-                    elif mids_value * MIDSMULTIPLIER > highs_value * HIGHSMULTIPLIER and mids_value * MIDSMULTIPLIER > bass_value:
-                        enemy.attackMids(mids_value * MIDSMULTIPLIER)
-                    else:
-                        enemy.attackHighs(highs_value * HIGHSMULTIPLIER)
-                    beat_index += 1
-            else:
-                beat_index += 1
-                
-            # onset_current_time = pygame.time.get_ticks() - attack_start_time_ms
-            # if onset_current_time >= (onsets[onset_index] * 1000):
-            #     enemy.attackOnset()
-            #     onset_index += 1
-                
+            while bassIndex < len(bass) and (bass[bassIndex][0] * 1000) <= attackCurrentTime + TIMINGOFFSET:
+                bassIndex += 1
+            if bassIndex < len(bass):
+                bassValue = bass[bassIndex][1]
 
-    
+            while midsIndex < len(mids) and (mids[midsIndex][0] * 1000) <= attackCurrentTime + TIMINGOFFSET:
+                midsIndex += 1
+            if midsIndex < len(mids):
+                midsValue = mids[midsIndex][1]
+
+            while highsIndex < len(highs) and (highs[highsIndex][0] * 1000) <= attackCurrentTime + TIMINGOFFSET:
+                highsIndex += 1
+            if highsIndex < len(highs):
+                highsValue = highs[highsIndex][1]
+            
+            if highsValue > HIGHSVOLUMETHRESHOLD:    
+                if highsIndex - search_range >= 0:
+                    start_index = max(highsIndex - search_range, 0)
+                    end_index = highsIndex - 1
+                    if highs[highsIndex][1] > max(highs[start_index:end_index], key=lambda x: x[1])[1]:
+                        if highsIndex + 1 < len(highs) and highs[highsIndex][1] > max(highs[highsIndex + 1:highsIndex + search_range], key=lambda x: x[1])[1]:
+                            enemy.attackHighs(highsValue)
+                            print("----------------------------------------------%%%%%%%%%%%%%%%%%%%%")
+            if midsValue > MIDSVOLUMETHRESHOLD:              
+                if midsIndex - search_range >= 0:
+                    start_index = max(midsIndex - search_range, 0)
+                    end_index = midsIndex - 1
+                    if mids[midsIndex][1] > max(mids[start_index:end_index], key=lambda x: x[1])[1]:
+                        if midsIndex + 1 < len(mids) and mids[midsIndex][1] > max(mids[midsIndex + 1:midsIndex + search_range], key=lambda x: x[1])[1]:
+                            enemy.attackMids(midsValue)
+                            print("---------------------%%%%%%%%%%%%%%%%%%%------------------------")       
+            if bassValue > BASSVOLUMETHRESHOLD:                 
+                if bassIndex - search_range >= 0:
+                    start_index = max(bassIndex - search_range, 0)
+                    end_index = bassIndex - 1
+                    if bass[bassIndex][1] > max(bass[start_index:end_index], key=lambda x: x[1])[1]:
+                        if bassIndex + 1 < len(bass) and bass[bassIndex][1] > max(bass[bassIndex + 1:bassIndex + search_range], key=lambda x: x[1])[1]:
+                            enemy.attackBass(bassValue)
+                            print("%%%%%%%%%%%%%%%%---------------------------------------------")
+                
+            print(f"{bassValue} {midsValue} {highsValue}")
+            
+                    
             drawProjectiles()
             drawLives(LIVES)    
             
