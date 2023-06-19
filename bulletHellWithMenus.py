@@ -119,13 +119,13 @@ def mainMenu():
 
         # Draw the start button
         start_button = pygame.Rect(300, 200, 200, 50)
-        pygame.draw.rect(screen, (255, 0, 0), start_button)
+        pygame.draw.rect(screen, (0, 153, 51), start_button)
         start_text = pygame.font.Font(None, 30).render("Start", True, (255, 255, 255))
         screen.blit(start_text, (355, 215))
 
         # Draw the song select button
         song_button = pygame.Rect(300, 300, 200, 50)
-        pygame.draw.rect(screen, (0, 255, 0), song_button)
+        pygame.draw.rect(screen, (0, 102, 255), song_button)
         song_text = pygame.font.Font(None, 30).render("Song Select", True, (255, 255, 255))
         screen.blit(song_text, (325, 315))
 
@@ -161,7 +161,7 @@ def mainMenu():
 
 def gameLoop(beats, onsets):
 
-    LIVES = 9001
+    LIVES = 9
     SCREENWIDTH = 700
     SCREENHEIGHT = 900
     MOVEMENTSPEED = 800
@@ -170,17 +170,18 @@ def gameLoop(beats, onsets):
     PROJECTILESPEED = 4
     PLAYERPROJECTILESPEED = 20
     GRAVITY = .2
-    PLAYERCOLOR = (255, 0, 0)
+    PLAYERCOLOR = (255, 128, 0)
     YELLOW = (255, 255, 0)
     GREEN = (0,255,0)
     RED = (255, 0, 0)
-    ENEMYCOLOR = (255, 0, 255)
+    ENEMYCOLOR = (255, 0, 0)
+    PROJECTILEBRIGHTNESS = 0.7
     SCORE = 0
     
-    BASSVOLUMETHRESHOLD = 80
+    BASSVOLUMETHRESHOLD = 60
     MIDSVOLUMETHRESHOLD = 60
-    HIGHSVOLUMETHRESHOLD = 50
-    TIMINGOFFSET = 0
+    HIGHSVOLUMETHRESHOLD = 60
+    TIMINGOFFSET = -800
         
     pygame.init()
     pygame.mixer.init()
@@ -277,26 +278,29 @@ def gameLoop(beats, onsets):
                 generateCircularProjectiles(projectiles, projectile_count=8, projectile_radius=5, sourceX=self.position[0], sourceY=self.position[1], angle=0)
                 
         def attackBass(self, value):
+            output_color = value * (255 / 100)
+            
             generateCircularProjectiles(projectiles, 
                                         projectile_count= 8, 
                                         projectile_radius= int(value / 5), 
                                         sourceX= self.position[0], 
                                         sourceY= self.position[1], 
                                         angle= 360 * (value/32), 
-                                        color= RED)
+                                        color= (0, output_color * PROJECTILEBRIGHTNESS, output_color * PROJECTILEBRIGHTNESS))
         
         def attackMids(self, value):
+            output_color = value * (255 // 100)
+            
             generateCircularProjectiles(projectiles, 
                                         projectile_count= max(1, (int(value) // 4)), 
                                         projectile_radius= 10, 
                                         sourceX= self.position[0], 
                                         sourceY= self.position[1], 
                                         angle= 360 * (value/32), 
-                                        color= YELLOW)
+                                        color= (output_color * PROJECTILEBRIGHTNESS, 0, output_color * PROJECTILEBRIGHTNESS))
         
         def attackHighs(self, value):
-            output_color = 120 + (value / 32) * (255 - 120)
-            output_color = min(output_color, 255)
+            output_color = value * (255 // 100)
 
             generateCircularProjectiles(projectiles,
                                         projectile_count=max(abs(int(value / 10)), 1),
@@ -304,7 +308,7 @@ def gameLoop(beats, onsets):
                                         sourceX= self.position[0],
                                         sourceY= self.position[1],
                                         angle=0,
-                                        color=(output_color,output_color,output_color))
+                                        color=(0, 64, 255))
                 
         def attackOnset(self):
             generateCircularProjectiles(projectiles, projectile_count=9, projectile_radius=20, sourceX=self.position[0], sourceY=self.position[1], angle=random.randint(0,360), color=YELLOW)
@@ -450,17 +454,17 @@ def gameLoop(beats, onsets):
         # ememy attacks
             attackCurrentTime = pygame.time.get_ticks() - attack_start_time_ms
 
-            while bassIndex < len(bass) and (bass[bassIndex][0] * 1000) <= attackCurrentTime + TIMINGOFFSET:
+            while bassIndex < len(bass) and (bass[bassIndex][0] * 1000) <= attackCurrentTime - TIMINGOFFSET:
                 bassIndex += 1
             if bassIndex < len(bass):
                 bassValue = bass[bassIndex][1]
 
-            while midsIndex < len(mids) and (mids[midsIndex][0] * 1000) <= attackCurrentTime + TIMINGOFFSET:
+            while midsIndex < len(mids) and (mids[midsIndex][0] * 1000) <= attackCurrentTime - TIMINGOFFSET:
                 midsIndex += 1
             if midsIndex < len(mids):
                 midsValue = mids[midsIndex][1]
 
-            while highsIndex < len(highs) and (highs[highsIndex][0] * 1000) <= attackCurrentTime + TIMINGOFFSET:
+            while highsIndex < len(highs) and (highs[highsIndex][0] * 1000) <= attackCurrentTime - TIMINGOFFSET:
                 highsIndex += 1
             if highsIndex < len(highs):
                 highsValue = highs[highsIndex][1]
@@ -470,7 +474,7 @@ def gameLoop(beats, onsets):
                     start_index = max(highsIndex - search_range, 0)
                     end_index = highsIndex - 1
                     if highs[highsIndex][1] > max(highs[start_index:end_index], key=lambda x: x[1])[1]:
-                        if highsIndex + 1 < len(highs) and highs[highsIndex][1] > max(highs[highsIndex + 1:highsIndex + search_range], key=lambda x: x[1])[1]:
+                        if highsIndex + 1 < len(highs) and highs[highsIndex][1] >= max(highs[highsIndex + 1:highsIndex + search_range], key=lambda x: x[1])[1]:
                             enemy.attackHighs(highsValue)
                             print("----------------------------------------------%%%%%%%%%%%%%%%%%%%%")
             if midsValue > MIDSVOLUMETHRESHOLD:              
@@ -478,7 +482,7 @@ def gameLoop(beats, onsets):
                     start_index = max(midsIndex - search_range, 0)
                     end_index = midsIndex - 1
                     if mids[midsIndex][1] > max(mids[start_index:end_index], key=lambda x: x[1])[1]:
-                        if midsIndex + 1 < len(mids) and mids[midsIndex][1] > max(mids[midsIndex + 1:midsIndex + search_range], key=lambda x: x[1])[1]:
+                        if midsIndex + 1 < len(mids) and mids[midsIndex][1] >= max(mids[midsIndex + 1:midsIndex + search_range], key=lambda x: x[1])[1]:
                             enemy.attackMids(midsValue)
                             print("---------------------%%%%%%%%%%%%%%%%%%%------------------------")       
             if bassValue > BASSVOLUMETHRESHOLD:                 
@@ -486,13 +490,12 @@ def gameLoop(beats, onsets):
                     start_index = max(bassIndex - search_range, 0)
                     end_index = bassIndex - 1
                     if bass[bassIndex][1] > max(bass[start_index:end_index], key=lambda x: x[1])[1]:
-                        if bassIndex + 1 < len(bass) and bass[bassIndex][1] > max(bass[bassIndex + 1:bassIndex + search_range], key=lambda x: x[1])[1]:
+                        if bassIndex + 1 < len(bass) and bass[bassIndex][1] >= max(bass[bassIndex + 1:bassIndex + search_range], key=lambda x: x[1])[1]:
                             enemy.attackBass(bassValue)
                             print("%%%%%%%%%%%%%%%%---------------------------------------------")
                 
-            print(f"{bassValue} {midsValue} {highsValue}")
+            print(f"Bass: {bassValue:.2f}    Mids: {midsValue:.2f}    Highs: {highsValue:.2f}", end="\r")
             
-                    
             drawProjectiles()
             drawLives(LIVES)    
             
