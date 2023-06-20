@@ -400,6 +400,9 @@ def gameLoop(beats, onsets):
     
     bassIndex, midsIndex, highsIndex = 0, 0, 0 
     bassValue, midsValue, highsValue = 0, 0, 0
+    bassLength = len(bass) - 1
+    midsLength = len(mids) - 1
+    highsLength = len(highs) - 1
     search_range = 3
 
     final_score = 0
@@ -411,9 +414,9 @@ def gameLoop(beats, onsets):
             if event.type == pygame.QUIT:
                 running = False
                 
-        if onset_index >= onsetsLength or beat_index >= beatsLength:
-            game_over = True
+        if bassIndex >= bassLength or midsIndex >= midsLength or highsIndex >= highsLength:
             win_condition = True
+            game_over = True
         
         if not game_over:
             playerInput(MOVEMENTSPEED, player1)
@@ -468,31 +471,34 @@ def gameLoop(beats, onsets):
                 highsIndex += 1
             if highsIndex < len(highs):
                 highsValue = highs[highsIndex][1]
-            
-            if highsValue > HIGHSVOLUMETHRESHOLD:    
+                        
+            if highsValue > HIGHSVOLUMETHRESHOLD:
                 if highsIndex - search_range >= 0:
                     start_index = max(highsIndex - search_range, 0)
-                    end_index = highsIndex - 1
+                    end_index = min(highsIndex - 1, len(highs) - 1)  # Ensure end_index is within array bounds
                     if highs[highsIndex][1] > max(highs[start_index:end_index], key=lambda x: x[1])[1]:
                         if highsIndex + 1 < len(highs) and highs[highsIndex][1] >= max(highs[highsIndex + 1:highsIndex + search_range], key=lambda x: x[1])[1]:
                             enemy.attackHighs(highsValue)
                             print("----------------------------------------------%%%%%%%%%%%%%%%%%%%%")
-            if midsValue > MIDSVOLUMETHRESHOLD:              
+
+            if midsValue > MIDSVOLUMETHRESHOLD:
                 if midsIndex - search_range >= 0:
                     start_index = max(midsIndex - search_range, 0)
-                    end_index = midsIndex - 1
+                    end_index = min(midsIndex - 1, len(mids) - 1)  # Ensure end_index is within array bounds
                     if mids[midsIndex][1] > max(mids[start_index:end_index], key=lambda x: x[1])[1]:
                         if midsIndex + 1 < len(mids) and mids[midsIndex][1] >= max(mids[midsIndex + 1:midsIndex + search_range], key=lambda x: x[1])[1]:
                             enemy.attackMids(midsValue)
-                            print("---------------------%%%%%%%%%%%%%%%%%%%------------------------")       
-            if bassValue > BASSVOLUMETHRESHOLD:                 
+                            print("---------------------%%%%%%%%%%%%%%%%%%%------------------------")
+
+            if bassValue > BASSVOLUMETHRESHOLD:
                 if bassIndex - search_range >= 0:
                     start_index = max(bassIndex - search_range, 0)
-                    end_index = bassIndex - 1
+                    end_index = min(bassIndex - 1, len(bass) - 1)  # Ensure end_index is within array bounds
                     if bass[bassIndex][1] > max(bass[start_index:end_index], key=lambda x: x[1])[1]:
                         if bassIndex + 1 < len(bass) and bass[bassIndex][1] >= max(bass[bassIndex + 1:bassIndex + search_range], key=lambda x: x[1])[1]:
                             enemy.attackBass(bassValue)
                             print("%%%%%%%%%%%%%%%%---------------------------------------------")
+
                 
             print(f"Bass: {bassValue:.2f}    Mids: {midsValue:.2f}    Highs: {highsValue:.2f}", end="\r")
             
