@@ -6,10 +6,9 @@ from tkinter import filedialog
 from typing import Any
 import random
 import math
-import librosa
 from threading import Thread
-import time
-import os
+import librosa
+#Copyright (c) 2013--2023, librosa development team.
 
 music_path = ''
 
@@ -232,11 +231,11 @@ def gameLoop(beats, onsets):
     PROJECTILESPEED = 4
     PLAYERPROJECTILESPEED = 20
     GRAVITY = .2
-    PLAYERCOLOR = (255, 128, 0)
+    PLAYERCOLOR = (255, 0, 149)
     YELLOW = (255, 255, 0)
     GREEN = (0,255,0)
     ENEMYCOLOR = (255, 0, 0)
-    PROJECTILEBRIGHTNESS = 0.7
+    PROJECTILEBRIGHTNESS = 1
     SCORE = 0
     
     BASSVOLUMETHRESHOLD = 60
@@ -302,6 +301,8 @@ def gameLoop(beats, onsets):
             horizontalSpeed = MOVEMENTSPEED
         if keys[pygame.K_x]:
             player.attack(horizontalSpeed= horizontalSpeed / 120)
+        if keys[pygame.K_ESCAPE]:
+            pygame.quit()
             
     class Enemy(pygame.sprite.Sprite):
         def __init__(self, screen, enemyRadius, enemyColor):
@@ -369,7 +370,7 @@ def gameLoop(beats, onsets):
                                         sourceX= self.position[0],
                                         sourceY= self.position[1],
                                         angle=0,
-                                        color=(0, 64, 255))
+                                        color=(119, 0, 255))
                 
         def attackOnset(self):
             generateCircularProjectiles(projectiles, projectile_count=9, projectile_radius=20, sourceX=self.position[0], sourceY=self.position[1], angle=random.randint(0,360), color=YELLOW)
@@ -417,7 +418,7 @@ def gameLoop(beats, onsets):
     def drawLives(lives):
         for i in range(lives):
             x = i * (heart_width + 5) 
-            y = 0  
+            y = SCREEN_HEIGHT - heart_width  
             screen.blit(heart_image, (x, y)) 
 
     def drawProjectiles():
@@ -447,7 +448,7 @@ def gameLoop(beats, onsets):
     
     enemy = Enemy(screen=screen, enemyRadius=20, enemyColor=ENEMYCOLOR)
     hitsound = pygame.mixer.Sound('hitsound.mp3')
-    enemyHitsound = pygame.mixer.Sound('enemyHit.mp3')
+    enemyHitsound = pygame.mixer.Sound('enemyHitsound.mp3')
     
     attack_start_time_ms = pygame.time.get_ticks()
     
