@@ -1,5 +1,6 @@
 import pygame.mixer
 import pygame
+from pygame.locals import *
 import tkinter as tk
 from tkinter import filedialog
 from typing import Any
@@ -11,6 +12,69 @@ import time
 import os
 
 music_path = ''
+
+SCREEN_HEIGHT = 900
+SCREEN_WIDTH = 700
+
+PLANE_SIZE = 900
+SUBDIVISIONS = 20
+SUB_PLANE_SIZE = PLANE_SIZE // SUBDIVISIONS
+
+PLANE_X_LOC = (SCREEN_WIDTH // 2) - (PLANE_SIZE // 2)
+PLANE_Y_LOC = (SCREEN_HEIGHT // 2) - (PLANE_SIZE // 2)
+
+PINK = (255, 105, 180)
+TEAL = (0, 128, 128)
+
+def create_vertex_groups(PLANE_SIZE, SUBDIVISIONS, bassValue, midsValue, highsValue):
+    vertex_array = []
+    plane_x_loc = (SCREEN_WIDTH // 4) + (PLANE_SIZE // 4)
+    plane_y_loc = (SCREEN_HEIGHT // 4) + (PLANE_SIZE // 4)
+    vertex_groups = []
+    
+    for j in range(SUBDIVISIONS + 1):
+        for i in range(SUBDIVISIONS + 1):
+            x = i * (PLANE_SIZE / SUBDIVISIONS) - (PLANE_SIZE / 2) + plane_x_loc
+            y = j * (PLANE_SIZE / SUBDIVISIONS) - (PLANE_SIZE / 2) + plane_y_loc
+            
+            if j <= SUBDIVISIONS // 3 and i % 2 == 0:
+                y = ((highsValue / 600) + 1) * y
+            elif j >= SUBDIVISIONS // 3 and j <= (SUBDIVISIONS // 3) * 2 and i % 2 == 0:
+                y = ((midsValue / 600) + 1) * y
+            elif j >= (SUBDIVISIONS // 3) * 2 and i % 2 == 0:
+                y = ((bassValue / 600) + 1) * y
+                   
+            vertex_array.append((x, y))
+    
+    row_size = SUBDIVISIONS + 1
+    for i in range(0, len(vertex_array), row_size):
+        row_group = vertex_array[i:i+row_size]
+        vertex_groups.append(tuple(row_group))
+    
+    return vertex_groups
+
+def draw_edges(screen, vertex_array):
+    last_location = (0, 0)
+    new_group = True 
+    num_groups = len(vertex_array)
+    
+    for group_index, groups in enumerate(vertex_array):
+        for vertex_index, location in enumerate(groups):
+            if new_group:
+                last_location = location
+                new_group = False
+            else:
+                # Calculate the color for the current edge based on the gradient
+                color_ratio = group_index / (num_groups - 1)  # Calculate the ratio based on group index
+                r = int(PINK[0] + (TEAL[0] - PINK[0]) * color_ratio)
+                g = int(PINK[1] + (TEAL[1] - PINK[1]) * color_ratio)
+                b = int(PINK[2] + (TEAL[2] - PINK[2]) * color_ratio)
+                color = (r, g, b)
+                
+                pygame.draw.line(screen, color, last_location, location, 1)
+                last_location = location
+        
+        new_group = True
 
 def audio_time_magnitude(audio_file):
     y, sr = librosa.load(audio_file)
@@ -49,15 +113,13 @@ def audio_time_magnitude(audio_file):
 def smoothData(array, smoothingFactor):
     smoothed_array = []
     num_points = len(array)
+    
     for i in range(num_points):
         if i < smoothingFactor // 2:
-            # Not enough previous points to calculate average
             smoothed_value = array[i][1]
         elif i >= num_points - smoothingFactor // 2:
-            # Not enough subsequent points to calculate average
             smoothed_value = array[i][1]
         else:
-            # Calculate the moving average
             start_index = i - smoothingFactor // 2
             end_index = i + smoothingFactor // 2
             values = [array[j][1] for j in range(start_index, end_index + 1)]
@@ -173,7 +235,6 @@ def gameLoop(beats, onsets):
     PLAYERCOLOR = (255, 128, 0)
     YELLOW = (255, 255, 0)
     GREEN = (0,255,0)
-    RED = (255, 0, 0)
     ENEMYCOLOR = (255, 0, 0)
     PROJECTILEBRIGHTNESS = 0.7
     SCORE = 0
@@ -389,10 +450,6 @@ def gameLoop(beats, onsets):
     enemyHitsound = pygame.mixer.Sound('enemyHit.mp3')
     
     attack_start_time_ms = pygame.time.get_ticks()
-    onset_index = 0
-    beat_index = 0
-    onsetsLength = len(onsets) - 1
-    beatsLength = len(beats) - 1
     
     smoothingFactor = 7
     bassChoppy, midsChoppy, highsChoppy = audio_time_magnitude(music_path)
@@ -423,6 +480,9 @@ def gameLoop(beats, onsets):
             playerScreenLock(player1)
             screen.fill((0, 0, 0))  
             
+            plane_verts = create_vertex_groups(PLANE_SIZE, SUBDIVISIONS, bassValue, midsValue, highsValue)
+            draw_edges(screen, plane_verts)
+            
         # hit detection and kill projectile on exiting screen
             for projectile in projectiles:
                 if hitDetected(player1.playerLocX, player1.playerLocY, player1.playerRadius, projectile.x, projectile.y, projectile.radius, 0.2):
@@ -435,7 +495,7 @@ def gameLoop(beats, onsets):
                     or projectile.y > SCREENHEIGHT + 100):
                     projectiles.remove(projectile)
                     
-        # enemy hit detection
+        # enemy hit detection and kill projectile on exiting screen
             for projectile in playerProjectiles:
                 if hitDetected(enemy.position[0], enemy.position[1], enemy.radius, projectile.x, projectile.y, projectile.radius, 1):
                     playerProjectiles.remove(projectile)
@@ -481,7 +541,6 @@ def gameLoop(beats, onsets):
                         enemy.attackHighs(highsValue)
                         print("----------------------------------------------%%%%%%%%%%%%%%%%%%%%")
 
-
             if midsIndex - search_range >= 0 and midsValue > MIDSVOLUMETHRESHOLD:
                 start_index = max(midsIndex - search_range, 0)
                 end_index = min(midsIndex - 1, len(mids) - 1)  # Ensure end_index is within array bounds
@@ -489,7 +548,6 @@ def gameLoop(beats, onsets):
                     if midsIndex + 1 < len(mids) and mids[midsIndex][1] >= max(mids[midsIndex + 1:midsIndex + search_range], key=lambda x: x[1])[1]:
                         enemy.attackMids(midsValue)
                         print("---------------------%%%%%%%%%%%%%%%%%%%------------------------")
-
 
             if bassIndex - search_range >= 0 and bassValue > BASSVOLUMETHRESHOLD:
                 start_index = max(bassIndex - search_range, 0)
