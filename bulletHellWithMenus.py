@@ -220,6 +220,9 @@ def mainMenu():
         pygame.display.flip()
         clock.tick(60)
 
+def hello():
+    print('helloworld')
+
 def gameLoop(beats, onsets):
 
     LIVES = 9
