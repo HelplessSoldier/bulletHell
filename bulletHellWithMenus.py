@@ -26,37 +26,62 @@ PINK = (255, 105, 180)
 TEAL = (0, 128, 128)
 
 def create_vertex_groups(PLANE_SIZE, SUBDIVISIONS, bassValue, midsValue, highsValue):
+    """
+    Generate a grid of (x, y) coordinates and shift every second vertex
+    based on the values of bass, mids, and highs.
+
+    Args:
+        PLANE_SIZE (int): Overall width and height of the grid.
+        SUBDIVISIONS (int): Number of vertices between the left/right and top/bottom of the plane.
+        bassValue (float): Value representing bass.
+        midsValue (float): Value representing mids.
+        highsValue (float): Value representing highs.
+
+    Returns:
+        list: Grid array of (x, y) coordinates grouped by row.
+            Example: [((x1, y1), (x2, y2)), ((x3, y3), (x4, y4))]
+
+    """
     vertex_array = []
     plane_x_loc = (SCREEN_WIDTH // 4) + (PLANE_SIZE // 4)
     plane_y_loc = (SCREEN_HEIGHT // 4) + (PLANE_SIZE // 4)
     vertex_groups = []
-    
+
     for j in range(SUBDIVISIONS + 1):
         for i in range(SUBDIVISIONS + 1):
             x = i * (PLANE_SIZE / SUBDIVISIONS) - (PLANE_SIZE / 2) + plane_x_loc
             y = j * (PLANE_SIZE / SUBDIVISIONS) - (PLANE_SIZE / 2) + plane_y_loc
-            
+        
             if j <= SUBDIVISIONS // 3 and i % 2 == 0:
                 y = ((highsValue / 600) + 1) * y
             elif j >= SUBDIVISIONS // 3 and j <= (SUBDIVISIONS // 3) * 2 and i % 2 == 0:
                 y = ((midsValue / 600) + 1) * y
             elif j >= (SUBDIVISIONS // 3) * 2 and i % 2 == 0:
                 y = ((bassValue / 600) + 1) * y
-                   
+          
             vertex_array.append((x, y))
-    
+
     row_size = SUBDIVISIONS + 1
     for i in range(0, len(vertex_array), row_size):
         row_group = vertex_array[i:i+row_size]
         vertex_groups.append(tuple(row_group))
-    
+
     return vertex_groups
 
 def draw_edges(screen, vertex_array):
+    """
+
+    draws edges between each vertex in a row and colomn 
+    and applies a color gradient from top to bottom
+
+    vertex array must be grouped by row:
+        Example: [((x1, y1), (x2, y2)), ((x3, y3), (x4, y4))]
+
+    """
     last_location = (0, 0)
     new_group = True 
     num_groups = len(vertex_array)
-    
+
     for group_index, groups in enumerate(vertex_array):
         for vertex_index, location in enumerate(groups):
             if new_group:
@@ -64,18 +89,37 @@ def draw_edges(screen, vertex_array):
                 new_group = False
             else:
                 # Calculate the color for the current edge based on the gradient
-                color_ratio = group_index / (num_groups - 1)  # Calculate the ratio based on group index
+                color_ratio = group_index / (num_groups - 1) 
                 r = int(PINK[0] + (TEAL[0] - PINK[0]) * color_ratio)
                 g = int(PINK[1] + (TEAL[1] - PINK[1]) * color_ratio)
                 b = int(PINK[2] + (TEAL[2] - PINK[2]) * color_ratio)
                 color = (r, g, b)
-                
+
                 pygame.draw.line(screen, color, last_location, location, 1)
                 last_location = location
-        
+
         new_group = True
 
 def audio_time_magnitude(audio_file):
+    """
+
+    imports a music file and splits it into an array of time/volume pairs
+    for each range bass, mids, and highs
+
+    output example: [(time(s), volume), ...]
+
+    Description:
+        - Loads the audio file using librosa and extracts the frequency components.
+        - Splits the frequency components into bass, mids, and highs ranges.
+        - Computes the magnitude spectrum of the audio.
+        - Calculates the mean magnitude within each frequency range.
+        - Retrieves the time information.
+        - Constructs a list of (time, magnitude) tuples for each frequency range.
+        - Returns the lists of time/magnitude pairs for bass, mids, and highs ranges.
+
+    """
+
+
     y, sr = librosa.load(audio_file)
 
     # Extract the frequency components using a Short-Time Fourier Transform (STFT)
@@ -110,6 +154,12 @@ def audio_time_magnitude(audio_file):
     return bass_data, mids_data, highs_data
 
 def smoothData(array, smoothingFactor):
+    """
+    
+    smooths volume data given from audio_time_magnitude using a smoothed moving average
+    
+    """
+
     smoothed_array = []
     num_points = len(array)
     
@@ -129,6 +179,14 @@ def smoothData(array, smoothingFactor):
     return smoothed_array
 
 def equalizeArrays(array1, array2, array3):
+    """
+    
+    scales each array to range between 0 and 100;
+    used to make every song's data consistent to 
+    the threshold values for enemy attacks
+
+    """
+
     maxValue = 100
     
     array1Multi = maxValue / max(x[1] for x in array1 if x[1] != maxValue)
@@ -219,9 +277,6 @@ def mainMenu():
 
         pygame.display.flip()
         clock.tick(60)
-
-def hello():
-    print('helloworld')
 
 def gameLoop(beats, onsets):
 
